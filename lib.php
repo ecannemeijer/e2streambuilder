@@ -248,7 +248,7 @@ function mediaUrls(): array
     $base = appBaseUrl();
 
     return [
-        'm3u' => $base . '/channels.m3u',
+        'm3u' => $base . '/channels.m3u8',
         'playlist' => $base . '/playlist.php',
         'epg' => $base . '/epg.xml.gz',
         'epg_plain' => $base . '/epg.xml',

@@ -5,6 +5,44 @@ require_once __DIR__ . '/lib.php';
 set_time_limit(120);
 ini_set('memory_limit', '256M');
 
+function publishedPlaylistPath(): string
+{
+    return __DIR__ . '/data/channels.m3u8';
+}
+
+function requestWantsPublishedPlaylist(): bool
+{
+    $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
+
+    return is_string($path) && preg_match('#/channels\.m3u8$#', $path) === 1;
+}
+
+function savePublishedPlaylist(string $body): void
+{
+    $path = publishedPlaylistPath();
+    $dir = dirname($path);
+    if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+        return;
+    }
+    $tmp = $path . '.tmp';
+    if (file_put_contents($tmp, $body, LOCK_EX) === false) {
+        return;
+    }
+    if (!rename($tmp, $path)) {
+        @unlink($tmp);
+    }
+}
+
+$publishedPath = publishedPlaylistPath();
+if (requestWantsPublishedPlaylist() && !isset($_REQUEST['filter']) && is_file($publishedPath)) {
+    header('Content-Type: audio/x-mpegurl; charset=utf-8');
+    header('Content-Disposition: inline; filename="e2.m3u8"');
+    header('Content-Length: ' . (string) filesize($publishedPath));
+    header('Cache-Control: no-cache');
+    readfile($publishedPath);
+    exit;
+}
+
 $type = $_REQUEST['type'] ?? 'all';
 if (!in_array($type, ['all', 'stream', 'tv'], true)) {
     $type = 'all';
@@ -40,7 +78,17 @@ if (isset($_REQUEST['download'])) {
     header('Content-Disposition: inline; filename="e2.m3u8"');
 }
 
+ob_start();
 writePlaylist($services, $selected, $type);
+$body = ob_get_clean();
+if ($body === false) {
+    $body = '';
+}
+if (isset($_REQUEST['download']) || requestWantsPublishedPlaylist()) {
+    savePublishedPlaylist($body);
+}
+header('Content-Length: ' . (string) strlen($body));
+echo $body;
 try {
     if (is_file(__DIR__ . '/epg.lib.php')) {
         require_once __DIR__ . '/epg.lib.php';
