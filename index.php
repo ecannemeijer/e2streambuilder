@@ -1,0 +1,172 @@
+<?php
+
+require_once __DIR__ . '/lib.php';
+
+$formError = null;
+$saved = isset($_GET['saved']);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
+    try {
+        saveReceiverSettings($_POST);
+        header('Location: index.php?saved=1');
+        exit;
+    } catch (InvalidArgumentException $e) {
+        $formError = $e->getMessage();
+    } catch (Throwable $e) {
+        $formError = $e->getMessage();
+    }
+}
+
+$settings = receiverSettings();
+$error = null;
+$bouquets = [];
+
+try {
+    $bouquets = fetchBouquets();
+} catch (Throwable $e) {
+    $error = $e->getMessage();
+}
+
+$base = appBaseUrl();
+$links = [
+    'All channels' => $base . '/playlist.php',
+    'Streams only' => $base . '/playlist.php?type=stream',
+    'Satellite only' => $base . '/playlist.php?type=tv',
+];
+$media = mediaUrls();
+
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>E2 Stream Builder</title>
+    <?php appThemeScript(); ?>
+    <link rel="stylesheet" href="assets/app.css?v=7">
+    <?php appShellStyle(); ?>
+</head>
+<body>
+<?php appChrome(); ?>
+<div class="app">
+    <header class="top">
+        <div class="brand">
+            <div class="mark" aria-hidden="true"></div>
+            <div>
+                <p class="eyebrow">Enigma2 channel list</p>
+                <h1>E2 Stream Builder</h1>
+                <p class="lede">Stream channels keep their own address in the playlist. Satellite channels stay a TS stream from the receiver. Click a stream to play it here.</p>
+            </div>
+        </div>
+        <div class="status" id="status"><i></i><span>Checking connection…</span></div>
+    </header>
+    <?php appNav('playlist'); ?>
+
+    <form class="toolbar" method="post" action="index.php">
+        <input type="hidden" name="save_settings" value="1">
+        <label class="field"><span>IP address</span>
+            <input name="host" value="<?= h($settings['host']) ?>" inputmode="decimal" autocomplete="off" required>
+        </label>
+        <label class="field port"><span>WebIF port</span>
+            <input name="webif_port" type="number" min="1" max="65535" value="<?= (int) $settings['webif_port'] ?>" required>
+        </label>
+        <label class="field port"><span>Stream port</span>
+            <input name="stream_port" type="number" min="1" max="65535" value="<?= (int) $settings['stream_port'] ?>" required>
+        </label>
+        <div class="actions">
+            <button class="btn primary" type="submit">Save</button>
+            <button class="btn" type="button" id="test">Test connection</button>
+        </div>
+        <p class="<?= $formError !== null ? 'error' : ($saved ? 'oknote' : 'note') ?>" id="test-result">
+            <?php if ($formError !== null): ?>
+                <?= h($formError) ?>
+            <?php elseif ($saved): ?>
+                Settings saved.
+            <?php else: ?>
+                The fixed playlists use this address.
+            <?php endif; ?>
+        </p>
+    </form>
+
+    <div class="workspace">
+        <section class="panel">
+            <h2>Bouquets</h2>
+            <?php if ($error !== null): ?>
+                <p class="error"><?= h($error) ?></p>
+            <?php else: ?>
+                <form id="export" method="post" action="playlist.php">
+                    <input type="hidden" name="filter" value="1">
+                    <input type="hidden" name="download" value="1">
+                    <div class="tools">
+                        <input class="search" id="q" type="search" placeholder="Search bouquets" autocomplete="off">
+                        <div class="filters">
+                            <button class="btn" type="button" id="all">All</button>
+                            <button class="btn" type="button" id="none">None</button>
+                            <button class="btn" type="button" id="streams">Streams only</button>
+                            <button class="btn" type="button" id="other">Other only</button>
+                        </div>
+                    </div>
+                    <p class="meta" id="bq-count"></p>
+                    <div class="list" id="bouquet-list">
+                        <?php foreach ($bouquets as $bouquet): ?>
+                            <div class="bq" data-name="<?= h(mb_strtolower($bouquet['name'], 'UTF-8')) ?>" data-stream="<?= $bouquet['stream'] ? '1' : '0' ?>">
+                                <input type="checkbox" name="bouquet[]" value="<?= h($bouquet['ref']) ?>" checked>
+                                <button class="bq-open" type="button" data-ref="<?= h($bouquet['ref']) ?>"><?= h($bouquet['name']) ?></button>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="export">
+                        <select class="select" name="type">
+                            <option value="all">Selection: streams and satellite</option>
+                            <option value="stream">Selection: streams only</option>
+                            <option value="tv">Selection: satellite only</option>
+                        </select>
+                        <button class="btn primary" type="submit">Download e2.m3u8</button>
+                    </div>
+                </form>
+            <?php endif; ?>
+        </section>
+
+        <section class="panel">
+            <h2>Channels</h2>
+            <div class="tools">
+                <input class="search" id="channel-q" type="search" placeholder="Search channels" autocomplete="off">
+                <label class="check"><input type="checkbox" id="only-streams"> Streams only</label>
+            </div>
+            <p class="meta" id="channel-meta">Choose a bouquet on the left.</p>
+            <div class="list" id="channel-list">
+                <p class="empty">No bouquet selected yet.</p>
+            </div>
+        </section>
+
+        <section class="panel player">
+            <h2>Playback</h2>
+            <div class="stage">
+                <video id="screen" controls playsinline></video>
+                <div class="placeholder" id="placeholder">Choose a stream channel to test.</div>
+            </div>
+            <div class="now">
+                <h3 id="now-name">No channel</h3>
+                <p class="note" id="now-state">Streams play here in the browser. Open RTMP and RTSP in VLC.</p>
+                <p class="url" id="now-url" hidden></p>
+            </div>
+            <div class="urlbox">
+                <p class="meta">M3U URL</p>
+                <p class="url"><?= h($media['m3u']) ?></p>
+                <button class="btn" type="button" data-copy="<?= h($media['m3u']) ?>">Copy</button>
+                <p class="meta">EPG URL</p>
+                <p class="url"><?= h($media['epg']) ?></p>
+                <button class="btn" type="button" data-copy="<?= h($media['epg']) ?>">Copy</button>
+            </div>
+            <ul class="links">
+                <?php foreach ($links as $label => $url): ?>
+                    <li><?= h($label) ?>: <a href="<?= h($url) ?>"><?= h($url) ?></a></li>
+                <?php endforeach; ?>
+            </ul>
+        </section>
+    </div>
+</div>
+<script src="assets/app.js?v=4"></script>
+<script src="assets/epg.js?v=3"></script>
+</body>
+</html>

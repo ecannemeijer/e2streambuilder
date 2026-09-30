@@ -1,0 +1,676 @@
+<?php
+
+require_once __DIR__ . '/config.php';
+
+function h(string $value): string
+{
+    return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+}
+
+function appNav(string $active): void
+{
+    $items = [
+        'playlist' => ['Playlist', 'index.php', false],
+        'epg' => ['EPG', 'epg.php', true],
+        'mapping' => ['EPG mapping', 'epg-mapping.php', true],
+    ];
+    echo '<nav class="nav">';
+    foreach ($items as $key => $item) {
+        $class = $key === $active ? ' class="active' . ($item[2] ? ' slow' : '') . '"' : ($item[2] ? ' class="slow"' : '');
+        echo '<a' . $class . ' href="' . h($item[1]) . '">' . h($item[0]) . '</a>';
+    }
+    echo '<button class="nav-btn" type="button" id="xtream-open">Xtream</button>';
+    echo '<label class="theme"><span>Theme</span><select id="theme">';
+    foreach (['dark' => 'Dark', 'light' => 'Light', 'ocean' => 'Ocean', 'amber' => 'Amber'] as $value => $label) {
+        echo '<option value="' . h($value) . '">' . h($label) . '</option>';
+    }
+    echo '</select></label>';
+    echo '<button class="btn" type="button" id="help-open">How it works</button>';
+    echo '</nav>';
+}
+
+function appThemeScript(): void
+{
+    echo '<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">';
+    echo '<script>(function(){try{var t=localStorage.getItem("e2-theme")||"dark";if(t!=="light"&&t!=="ocean"&&t!=="amber")t="dark";document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","dark");}})();</script>';
+}
+
+function appShellStyle(): void
+{
+    echo '<style>
+#loading,#help,#xtream{display:none !important}
+#loading.is-open,#help.is-open,#xtream.is-open{display:flex !important;position:fixed !important;top:0;right:0;bottom:0;left:0;z-index:4000;align-items:center;justify-content:center;margin:0;padding:24px;background:rgba(0,0,0,.55);color:#f4f7f4}
+#loading.is-open{flex-direction:column;gap:14px;z-index:5000 !important}
+#loading p{max-width:36rem;margin:0;text-align:center;line-height:1.45;word-break:break-word}
+#loading .spinner{width:46px;height:46px;border:4px solid rgba(255,255,255,.28);border-top-color:#e2a85a;border-radius:50%;animation:e2spin .8s linear infinite}
+#help .dialog,#xtream .dialog{width:min(640px,100%);max-height:min(80vh,720px);overflow:auto;background:var(--raise,#181e19);color:var(--text,#e7efe6);border:1px solid var(--line,#313a32);border-radius:14px;padding:18px;box-shadow:0 18px 40px rgba(0,0,0,.35)}
+#help .dialog h2,#xtream .dialog h2{margin:0 0 8px}
+#help .dialog p,#help .dialog li,#xtream .dialog p,#xtream .dialog li{color:var(--muted,#93a196)}
+#help .dialog ol{margin:0 0 12px;padding-left:1.2rem}
+@keyframes e2spin{to{transform:rotate(360deg)}}
+html[data-theme="light"]{color-scheme:light;--bg:#f4f1ea !important;--raise:#fffdf8 !important;--raise-2:#efe8dc !important;--line:#d7cec0 !important;--text:#241c14 !important;--muted:#6d645b !important;--accent:#b86a1d !important;--accent-ink:#fff8ef !important;--accent-line:#8d4e12 !important;--good:#2f7d46 !important;--warn:#a15c12 !important;--bad:#b42318 !important;--sat:#3d5a73 !important;--stage:#1c1916 !important;--shadow:0 18px 40px rgba(70,48,20,.12) !important}
+html[data-theme="ocean"]{color-scheme:dark;--bg:#0d1720 !important;--raise:#142230 !important;--raise-2:#1b2d3e !important;--line:#2c455c !important;--text:#e7f2f8 !important;--muted:#93adbf !important;--accent:#3db7c9 !important;--accent-ink:#062026 !important;--accent-line:#2a8f9e !important;--good:#7dcea0 !important;--warn:#e2b15a !important;--bad:#e07a68 !important;--sat:#9eb4d0 !important;--stage:#071018 !important;--shadow:0 18px 40px rgba(0,0,0,.32) !important}
+html[data-theme="amber"]{color-scheme:dark;--bg:#1a120c !important;--raise:#261910 !important;--raise-2:#322016 !important;--line:#4d3424 !important;--text:#f8efe6 !important;--muted:#c4a892 !important;--accent:#f0a04b !important;--accent-ink:#2a1606 !important;--accent-line:#c47a2a !important;--good:#c6d48a !important;--warn:#f0a04b !important;--bad:#e07a68 !important;--sat:#d7c3a4 !important;--stage:#100b08 !important;--shadow:0 18px 40px rgba(0,0,0,.35) !important}
+</style>';
+    echo '<script>
+document.addEventListener("DOMContentLoaded",function(){
+  var root=document.documentElement;
+  var theme=document.getElementById("theme");
+  var help=document.getElementById("help");
+  var loading=document.getElementById("loading");
+  function applyTheme(name){
+    if(name!=="light"&&name!=="ocean"&&name!=="amber")name="dark";
+    root.setAttribute("data-theme",name);
+    if(theme)theme.value=name;
+    try{localStorage.setItem("e2-theme",name);}catch(e){}
+  }
+  if(theme){
+    theme.value=root.getAttribute("data-theme")||"dark";
+    theme.addEventListener("change",function(){applyTheme(theme.value);});
+  }
+  var xtream=document.getElementById("xtream");
+  function openHelp(){if(help)help.classList.add("is-open");}
+  function closeHelp(){if(help)help.classList.remove("is-open");}
+  function openXtream(){if(xtream)xtream.classList.add("is-open");}
+  function closeXtream(){if(xtream)xtream.classList.remove("is-open");}
+  var helpOpen=document.getElementById("help-open");
+  if(helpOpen)helpOpen.addEventListener("click",openHelp);
+  var xtreamOpen=document.getElementById("xtream-open");
+  if(xtreamOpen)xtreamOpen.addEventListener("click",openXtream);
+  document.querySelectorAll("[data-close-help]").forEach(function(button){button.addEventListener("click",closeHelp);});
+  document.querySelectorAll("[data-close-xtream]").forEach(function(button){button.addEventListener("click",closeXtream);});
+  if(help)help.addEventListener("click",function(event){if(event.target===help)closeHelp();});
+  if(xtream)xtream.addEventListener("click",function(event){if(event.target===xtream)closeXtream();});
+  document.addEventListener("keydown",function(event){if(event.key==="Escape"){closeHelp();closeXtream();}});
+  if(/[?&]xtream=1(?:&|$)/.test(location.search))openXtream();
+  function showLoading(text){
+    if(!loading)return;
+    loading.classList.add("is-open");
+    var label=document.getElementById("loading-text");
+    if(label)label.textContent=text||"Loading…";
+  }
+  window.addEventListener("pageshow",function(){
+    if(loading)loading.classList.remove("is-open");
+    var label=document.getElementById("loading-text");
+    if(label)label.textContent="Loading…";
+  });
+  function startProgress(form, event){
+    if(event.defaultPrevented)return true;
+    var submitter=event.submitter||null;
+    var action=submitter&&submitter.name==="action"?String(submitter.value):"";
+    var target=form.getAttribute("action")||"";
+    var isDownload=action==="download_source"||action==="refresh";
+    var isXtream=target.indexOf("xtream-build.php")!==-1;
+    if(!isDownload&&!isXtream)return false;
+    event.preventDefault();
+    showLoading(isXtream?"Starting the Xtream build…":"Starting the EPG download…");
+    var body=new FormData(form);
+    if(submitter&&submitter.name)body.append(submitter.name,submitter.value);
+    body.append("progress","1");
+    var url=form.getAttribute("action")||location.href;
+    var finished=false;
+    fetch(url,{method:"POST",body:body,credentials:"same-origin"})
+      .then(function(response){
+        if(!response.body)throw new Error("The browser could not read the progress stream.");
+        var reader=response.body.getReader();
+        var decoder=new TextDecoder();
+        var buffer="";
+        function handleLine(line){
+          line=line.trim();
+          if(!line||line.charAt(0)!=="{")return;
+          var data=JSON.parse(line);
+          if(data.text)showLoading(data.text);
+          if(data.done){
+            finished=true;
+            if(data.redirect)location.href=data.redirect;
+            else location.reload();
+          }
+        }
+        function pump(){
+          return reader.read().then(function(result){
+            if(result.done){
+              if(buffer.trim()){try{handleLine(buffer);}catch(e){}}
+              if(!finished)location.reload();
+              return;
+            }
+            buffer+=decoder.decode(result.value,{stream:true});
+            var lines=buffer.split("\\n");
+            buffer=lines.pop();
+            lines.forEach(function(line){try{handleLine(line);}catch(e){}});
+            if(!finished)return pump();
+          });
+        }
+        return pump();
+      })
+      .catch(function(error){
+        showLoading(error&&error.message?error.message:"The update failed.");
+      });
+    return true;
+  }
+  function onWork(form){
+    form.addEventListener("submit",function(event){
+      if(startProgress(form,event))return;
+      if(!event.defaultPrevented)showLoading();
+    });
+  }
+  document.querySelectorAll("a.slow,a[href=\\"epg.php\\"],a[href^=\\"epg-mapping.php\\"]").forEach(function(link){
+    link.addEventListener("click",function(event){
+      if(event.defaultPrevented||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||link.target==="_blank")return;
+      showLoading();
+    });
+  });
+  if(/(?:^|\\/)epg(?:-mapping)?\\.php$/.test(location.pathname)){
+    document.querySelectorAll("form").forEach(onWork);
+  }
+  document.querySelectorAll("form.slow").forEach(onWork);
+});
+</script>';
+}
+
+function appChrome(): void
+{
+    echo '<div id="loading"><div class="spinner" aria-hidden="true"></div><p id="loading-text">Loading…</p></div>';
+    echo '<div id="help">';
+    echo '<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="help-title">';
+    echo '<h2 id="help-title">How this works</h2>';
+    echo '<p>This site turns your Enigma2 receiver into a playlist for TiviMate, and adds a programme guide.</p>';
+    echo '<ol>';
+    echo '<li>Set the receiver IP on the Playlist page and save.</li>';
+    echo '<li>Copy the M3U URL into TiviMate as a playlist.</li>';
+    echo '<li>Copy the EPG URL into TiviMate as an XMLTV source. Use the <code>.gz</code> address.</li>';
+    echo '<li>TiviMate matches the guide with <code>tvg-id</code>. That id is the same as the channel id in the XMLTV file.</li>';
+    echo '</ol>';
+    echo '<p><strong>Download this source</strong> fetches only that country file. <strong>Download all</strong> fetches every enabled source, matches your channels, and rebuilds the guide.</p>';
+    echo '<p>On EPG mapping you can correct a wrong link. A manual link is kept and always wins over automatic matching.</p>';
+    echo '<p>The guide refreshes once per interval when the playlist or EPG is requested. For a fixed time, schedule <code>epg-update.bat</code>.</p>';
+    echo '<p><strong>Xtream Codes:</strong> press <strong>Xtream</strong> next to EPG mapping. Build the list there, then in TiviMate add a playlist, choose Xtream Codes, and paste the server URL, username and password. Channel order follows the bouquet list on the receiver.</p>';
+    echo '<p>More detail is in <code>README.md</code>.</p>';
+    echo '<button class="btn primary" type="button" data-close-help>Close</button>';
+    echo '</div></div>';
+    appXtreamModal();
+}
+
+function appXtreamModal(): void
+{
+    require_once __DIR__ . '/xtream.lib.php';
+    $xtream = xtreamSettings();
+    $stats = ['categories' => 0, 'channels' => 0, 'epg_error' => '', 'built_at' => null, 'build_error' => ''];
+    $loadError = null;
+    try {
+        $stats = xtreamStats();
+    } catch (Throwable $e) {
+        $loadError = $e->getMessage();
+    }
+    $return = basename((string) ($_SERVER['SCRIPT_NAME'] ?? 'index.php'));
+    if (!in_array($return, ['index.php', 'epg.php', 'epg-mapping.php'], true)) {
+        $return = 'index.php';
+    }
+    $base = appBaseUrl();
+    echo '<div id="xtream">';
+    echo '<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="xtream-title">';
+    echo '<h2 id="xtream-title">Xtream Codes</h2>';
+    echo '<p>Build the channel list in the same order as the bouquets on the receiver, then add it in TiviMate as an Xtream Codes playlist. The server URL does not include <code>player_api.php</code>.</p>';
+    if ($loadError !== null) {
+        echo '<p class="error">' . h($loadError) . '</p>';
+    }
+    if (isset($_GET['xtream'])) {
+        echo '<p class="oknote">Xtream catalog built.</p>';
+    }
+    if ($stats['build_error'] !== '') {
+        echo '<p class="error">' . h($stats['build_error']) . '</p>';
+    }
+    if ($stats['epg_error'] !== '') {
+        echo '<p class="error">' . h($stats['epg_error']) . '</p>';
+    }
+    echo '<form method="post" action="xtream-build.php" class="stack slow">';
+    echo '<input type="hidden" name="build_xtream" value="1">';
+    echo '<input type="hidden" name="return" value="' . h($return) . '">';
+    echo '<label class="field wide"><span>Username</span><input name="xtream_username" value="' . h($xtream['xtream_username']) . '" maxlength="64" required></label>';
+    echo '<label class="field wide"><span>Password</span><input name="xtream_password" value="' . h($xtream['xtream_password']) . '" maxlength="64" autocomplete="off" placeholder="Generated on first build"></label>';
+    echo '<button class="btn primary" type="submit">Build Xtream</button>';
+    echo '</form>';
+    echo '<p class="meta">Server URL</p><p class="url">' . h($base) . '</p>';
+    echo '<button class="btn" type="button" data-copy="' . h($base) . '">Copy</button>';
+    echo '<p class="meta">Username</p><p class="url">' . h($xtream['xtream_username']) . '</p>';
+    echo '<button class="btn" type="button" data-copy="' . h($xtream['xtream_username']) . '">Copy</button>';
+    if ($xtream['xtream_password'] !== '') {
+        echo '<p class="meta">Password</p><p class="url">' . h($xtream['xtream_password']) . '</p>';
+        echo '<button class="btn" type="button" data-copy="' . h($xtream['xtream_password']) . '">Copy</button>';
+    }
+    $built = $stats['built_at'] ? ' · built ' . h((string) $stats['built_at']) : '';
+    echo '<p class="meta">' . (int) $stats['categories'] . ' categories · ' . (int) $stats['channels'] . ' channels' . $built . '</p>';
+    echo '<button class="btn" type="button" data-close-xtream>Close</button>';
+    echo '</div></div>';
+}
+
+function mediaUrls(): array
+{
+    $base = appBaseUrl();
+
+    return [
+        'm3u' => $base . '/channels.m3u',
+        'playlist' => $base . '/playlist.php',
+        'epg' => $base . '/epg.xml.gz',
+        'epg_plain' => $base . '/epg.xml',
+    ];
+}
+
+function webifGet(string $path): string
+{
+    $settings = receiverSettings();
+    $url = 'http://' . $settings['host'] . ':' . $settings['webif_port'] . $path;
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 90,
+        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_HTTPHEADER => ['Accept: application/json'],
+    ]);
+    $body = curl_exec($ch);
+    $error = curl_error($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($body === false) {
+        throw new RuntimeException('No connection to the receiver: ' . $error);
+    }
+    if ($code !== 200) {
+        throw new RuntimeException('The receiver responded with HTTP ' . $code);
+    }
+
+    return $body;
+}
+
+function webifJson(string $path): array
+{
+    $data = json_decode(webifGet($path), true);
+    if (!is_array($data)) {
+        throw new RuntimeException('The receiver did not return valid JSON.');
+    }
+
+    return $data;
+}
+
+/**
+ * @return list<array{ref: string, name: string, stream: bool}>
+ */
+function fetchBouquets(): array
+{
+    $data = webifJson('/api/bouquets');
+    $rows = $data['bouquets'] ?? [];
+    $bouquets = [];
+
+    foreach ($rows as $row) {
+        if (!is_array($row) || count($row) < 2) {
+            continue;
+        }
+        $ref = (string) $row[0];
+        $name = trim((string) $row[1]);
+        if ($ref === '' || $name === '') {
+            continue;
+        }
+        $bouquets[] = [
+            'ref' => $ref,
+            'name' => $name,
+            'stream' => strncmp($name, 'Stream ', 7) === 0,
+        ];
+    }
+
+    return $bouquets;
+}
+
+function fetchAllServices(): array
+{
+    return webifJson('/api/getallservices');
+}
+
+function isMarker(string $sref): bool
+{
+    $parts = explode(':', $sref);
+
+    return isset($parts[1]) && $parts[1] === '64';
+}
+
+function isStreamService(string $sref): bool
+{
+    $type = explode(':', $sref, 2)[0];
+
+    return in_array($type, ['4097', '5001', '5002', '8193'], true);
+}
+
+function directStreamUrl(string $sref, string $name): ?string
+{
+    if (!isStreamService($sref)) {
+        return null;
+    }
+
+    $parts = explode(':', $sref);
+    if (count($parts) < 11) {
+        return null;
+    }
+
+    $decoded = rawurldecode(implode(':', array_slice($parts, 10)));
+    $name = trim($name);
+    if ($name !== '' && str_ends_with($decoded, ':' . $name)) {
+        $decoded = substr($decoded, 0, -strlen(':' . $name));
+    } else {
+        $pos = strrpos($decoded, ':');
+        if ($pos !== false) {
+            $candidate = substr($decoded, 0, $pos);
+            if (isDirectUrl($candidate)) {
+                $decoded = $candidate;
+            }
+        }
+    }
+
+    $decoded = trim($decoded);
+
+    return isDirectUrl($decoded) ? $decoded : null;
+}
+
+function isDirectUrl(string $url): bool
+{
+    return (bool) preg_match('#^(https?|rtmp|rtmps|rtsp|mms|mmsh)://#i', $url);
+}
+
+function encodeServiceRef(string $sref): string
+{
+    $encoded = preg_replace_callback(
+        '/[^A-Za-z0-9:\/._~%-]|%(?![0-9A-Fa-f]{2})/',
+        static function (array $match): string {
+            return rawurlencode($match[0]);
+        },
+        $sref
+    );
+
+    return $encoded ?? '';
+}
+
+function receiverStreamUrl(string $sref): string
+{
+    $settings = receiverSettings();
+
+    return 'http://' . $settings['host'] . ':' . $settings['stream_port'] . '/' . encodeServiceRef($sref);
+}
+
+function playbackKind(string $url, string $source): string
+{
+    $lower = strtolower($url);
+    if (preg_match('#^(rtmp|rtmps|rtsp|mms|mmsh)://#', $lower)) {
+        return 'external';
+    }
+    if ($source === 'satellite') {
+        return 'ts';
+    }
+    if (str_contains($lower, '.m3u8') || str_contains($lower, 'format=m3u8') || str_contains($lower, 'output=hls')) {
+        return 'hls';
+    }
+    if (preg_match('#\.(mp4|m4v|webm)(\?|$)#', $lower)) {
+        return 'file';
+    }
+    if (str_contains($lower, '.ts')) {
+        return 'ts';
+    }
+
+    return 'hls';
+}
+
+/**
+ * @return array{url: string, source: string, kind: string}|null
+ */
+function channelPlayback(string $sref, string $name): ?array
+{
+    if ($sref === '' || $name === '' || isMarker($sref)) {
+        return null;
+    }
+
+    if (isStreamService($sref)) {
+        $url = directStreamUrl($sref, $name);
+        if ($url === null) {
+            return null;
+        }
+
+        return [
+            'url' => $url,
+            'source' => 'stream',
+            'kind' => playbackKind($url, 'stream'),
+        ];
+    }
+
+    if (explode(':', $sref, 2)[0] !== '1') {
+        return null;
+    }
+
+    return [
+        'url' => receiverStreamUrl($sref),
+        'source' => 'satellite',
+        'kind' => 'ts',
+    ];
+}
+
+function m3uText(string $value): string
+{
+    $value = str_replace(["\r", "\n", '"'], ['', '', "'"], $value);
+
+    return trim($value);
+}
+
+function canonicalServiceRef(string $sref): string
+{
+    $parts = explode(':', trim(rawurldecode($sref)));
+    if (count($parts) > 11) {
+        $parts = array_slice($parts, 0, 11);
+    }
+    while (count($parts) < 11) {
+        $parts[] = '';
+    }
+    for ($i = 2; $i <= 6; $i++) {
+        if ($parts[$i] !== '' && ctype_xdigit($parts[$i])) {
+            $parts[$i] = strtoupper($parts[$i]);
+        }
+    }
+
+    return implode(':', array_slice($parts, 0, 10)) . ':';
+}
+
+function satelliteFromSref(string $sref): string
+{
+    $parts = explode(':', canonicalServiceRef($sref));
+    if (($parts[0] ?? '') !== '1' || !ctype_xdigit($parts[6] ?? '')) {
+        return '';
+    }
+    $position = (hexdec($parts[6]) >> 16) & 0xFFFF;
+    if ($position <= 0 || $position > 3600) {
+        return '';
+    }
+    $west = $position > 1800;
+    $tenths = $west ? 3600 - $position : $position;
+    $label = number_format($tenths / 10, 1, '.', '') . ($west ? '°W' : '°E');
+    $known = [
+        '19.2°E' => 'Astra 19.2°E',
+        '23.5°E' => 'Astra 23.5°E',
+        '28.2°E' => 'Astra 28.2°E',
+        '13.0°E' => 'Hotbird 13.0°E',
+    ];
+
+    return $known[$label] ?? $label;
+}
+
+function playlistTvgIds(): array
+{
+    static $loaded = false;
+    static $map = [];
+    if (!empty($GLOBALS['playlist_tvg_reset'])) {
+        $loaded = false;
+        $map = [];
+        unset($GLOBALS['playlist_tvg_reset']);
+    }
+    if ($loaded) {
+        return $map;
+    }
+    $loaded = true;
+    $file = __DIR__ . '/epg.lib.php';
+    if (!is_file($file)) {
+        return [];
+    }
+    require_once $file;
+    try {
+        $map = epgTvgIdMap();
+    } catch (Throwable $e) {
+        $map = [];
+    }
+
+    return $map;
+}
+
+/**
+ * @param array<string, true>|null $selectedRefs null = alle bouquets
+ * @return list<array{name: string, url: string, group: string}>
+ */
+function playlistRows(array $services, ?array $selectedRefs, string $type): array
+{
+    $rows = [];
+    foreach ($services['services'] ?? [] as $bouquet) {
+        if (!is_array($bouquet)) {
+            continue;
+        }
+        $bouquetRef = (string) ($bouquet['servicereference'] ?? '');
+        if ($selectedRefs !== null && !isset($selectedRefs[$bouquetRef])) {
+            continue;
+        }
+        $group = m3uText((string) ($bouquet['servicename'] ?? ''));
+        if ($group === '') {
+            $group = 'Bouquet';
+        }
+        foreach ($bouquet['subservices'] ?? [] as $channel) {
+            if (!is_array($channel)) {
+                continue;
+            }
+            $rawRef = (string) ($channel['servicereference'] ?? '');
+            $name = m3uText((string) ($channel['servicename'] ?? ''));
+            $play = channelPlayback($rawRef, $name);
+            if ($play === null) {
+                continue;
+            }
+            if ($type === 'stream' && $play['source'] !== 'stream') {
+                continue;
+            }
+            if ($type === 'tv' && $play['source'] !== 'satellite') {
+                continue;
+            }
+            $rows[] = [
+                'name' => $name,
+                'match_name' => $name,
+                'sref' => canonicalServiceRef($rawRef),
+                'url' => $play['url'],
+                'group' => $group,
+                'bouquet_ref' => $bouquetRef !== '' ? $bouquetRef : 'group:' . $group,
+                'satellite' => satelliteFromSref($rawRef),
+            ];
+        }
+    }
+
+    return disambiguatePlaylistRows($rows);
+}
+
+/**
+ * Dezelfde stream in meerdere bouquets krijgt een eigen naam en adres,
+ * zodat een speler die dubbele adressen weglaat ze allemaal houdt.
+ *
+ * @param list<array{name: string, url: string, group: string}> $rows
+ * @return list<array{name: string, url: string, group: string}>
+ */
+function disambiguatePlaylistRows(array $rows): array
+{
+    $counts = [];
+    foreach ($rows as $row) {
+        $counts[$row['url']] = ($counts[$row['url']] ?? 0) + 1;
+    }
+
+    $seen = [];
+    foreach ($rows as $index => $row) {
+        if ($counts[$row['url']] < 2) {
+            continue;
+        }
+        $seen[$row['url']] = ($seen[$row['url']] ?? 0) + 1;
+        $number = $seen[$row['url']];
+        $rows[$index]['name'] = $row['name'] . $number;
+        $rows[$index]['url'] = $row['url'] . '#e2=' . $number;
+    }
+
+    return $rows;
+}
+
+/**
+ * @param array<string, true>|null $selectedRefs null = alle bouquets
+ */
+function writePlaylist(array $services, ?array $selectedRefs, string $type): int
+{
+    echo "#EXTM3U\n";
+    $count = 0;
+    $tvgIds = playlistTvgIds();
+    foreach (playlistRows($services, $selectedRefs, $type) as $row) {
+        $name = $row['name'];
+        $attrs = '';
+        $tvgId = $tvgIds[$row['sref'] ?? ''] ?? '';
+        if ($tvgId !== '') {
+            $attrs .= ' tvg-id="' . m3uText($tvgId) . '"';
+        }
+        echo '#EXTINF:-1' . $attrs . ' tvg-name="' . $name . '" group-title="' . $row['group'] . '",' . $name . "\n";
+        echo $row['url'] . "\n";
+        $count++;
+    }
+
+    return $count;
+}
+
+/**
+ * @return list<array{name: string, url: string, source: string, kind: string}>
+ */
+function channelsForBouquet(string $ref): array
+{
+    $known = false;
+    foreach (fetchBouquets() as $bouquet) {
+        if ($bouquet['ref'] === $ref) {
+            $known = true;
+            break;
+        }
+    }
+    if (!$known) {
+        throw new InvalidArgumentException('This bouquet is not on the receiver.');
+    }
+
+    $data = webifJson('/api/getservices?sRef=' . rawurlencode($ref));
+    $channels = [];
+    foreach ($data['services'] ?? [] as $channel) {
+        if (!is_array($channel)) {
+            continue;
+        }
+        $name = trim((string) ($channel['servicename'] ?? ''));
+        $play = channelPlayback((string) ($channel['servicereference'] ?? ''), $name);
+        if ($play === null) {
+            continue;
+        }
+        $channels[] = [
+            'name' => $name,
+            'url' => $play['url'],
+            'source' => $play['source'],
+            'kind' => $play['kind'],
+        ];
+    }
+
+    return $channels;
+}
+
+function appBaseUrl(): string
+{
+    $https = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on';
+    $host = $_SERVER['HTTP_HOST'] ?? 'openwebif.test';
+    $dir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
+    $dir = rtrim($dir, '/');
+    if ($dir === '/' || $dir === '.') {
+        $dir = '';
+    }
+
+    return ($https ? 'https' : 'http') . '://' . $host . $dir;
+}

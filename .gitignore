@@ -1,0 +1,3 @@
+# Receiver settings, downloaded EPG files, the generated guide, logs, and SQLite.
+/data/*
+!/data/.htaccess
