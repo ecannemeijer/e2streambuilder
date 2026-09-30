@@ -1705,48 +1705,15 @@ function epgXmlEscape(string $value): string
     return htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
 }
 
-function epgProgrammeForChannel(string $outer, string $to): string
-{
-    $replaced = preg_replace_callback(
-        '/<programme\b[^>]*>/',
-        static function (array $match) use ($to): string {
-            $tag = preg_replace(
-                '/\bchannel=(["\']).*?\1/',
-                'channel="' . epgXmlEscape($to) . '"',
-                $match[0],
-                1,
-                $count
-            );
-
-            return ($count === 1 && is_string($tag)) ? $tag : $match[0];
-        },
-        $outer,
-        1
-    );
-    if (!is_string($replaced) || $replaced === $outer) {
-        return $outer;
-    }
-    $replaced = preg_replace(
-        '/<(desc|credits|star-rating|review|video|audio|previously-shown)\b[^>]*>.*?<\/\1>\s*/s',
-        '',
-        $replaced
-    ) ?? $replaced;
-    $replaced = preg_replace('/<icon\b[^>]*\/>\s*/', '', $replaced) ?? $replaced;
-
-    return $replaced;
-}
-
 function epgGenerateXml(): array
 {
     @ini_set('memory_limit', '512M');
     $playlist = epgPlaylistByRef();
     $wanted = [];
     $names = [];
-    $refsById = [];
     foreach (epgDb()->query("SELECT service_ref, xmltv_id FROM epg_mappings
         WHERE xmltv_id IS NOT NULL AND xmltv_id != '' AND status IN ('MATCHED', 'MANUAL')") as $row) {
-        $ref = (string) $row['service_ref'];
-        $service = $playlist[$ref] ?? null;
+        $service = $playlist[(string) $row['service_ref']] ?? null;
         if (!is_array($service)) {
             continue;
         }
@@ -1754,9 +1721,6 @@ function epgGenerateXml(): array
         $wanted[$id] = true;
         if (!isset($names[$id])) {
             $names[$id] = (string) ($service['match_name'] ?? $service['name'] ?? $id);
-        }
-        if ($ref !== '' && $ref !== $id) {
-            $refsById[$id][$ref] = (string) ($service['match_name'] ?? $service['name'] ?? $ref);
         }
     }
     $owners = [];
@@ -1805,15 +1769,6 @@ function epgGenerateXml(): array
         }
         fwrite($handle, "  </channel>\n");
     }
-    $aliasChannels = 0;
-    foreach ($refsById as $refs) {
-        foreach ($refs as $ref => $bouquetName) {
-            $aliasChannels++;
-            fwrite($handle, '  <channel id="' . epgXmlEscape($ref) . "\">\n");
-            fwrite($handle, '    <display-name>' . epgXmlEscape($bouquetName) . "</display-name>\n");
-            fwrite($handle, "  </channel>\n");
-        }
-    }
     $programmes = 0;
     $seen = [];
     foreach (epgEnabledSources() as $source) {
@@ -1822,7 +1777,7 @@ function epgGenerateXml(): array
             continue;
         }
         $sourceId = (int) $source['id'];
-        epgWalkElements($path, static function (string $name, array $attributes, string $outer) use ($handle, $owners, $sourceId, $refsById, &$programmes, &$seen): void {
+        epgWalkElements($path, static function (string $name, array $attributes, string $outer) use ($handle, $owners, $sourceId, &$programmes, &$seen): void {
             if ($name !== 'programme') {
                 return;
             }
@@ -1837,14 +1792,6 @@ function epgGenerateXml(): array
             $seen[$key] = true;
             fwrite($handle, $outer . "\n");
             $programmes++;
-            foreach ($refsById[$channel] ?? [] as $ref => $bouquetName) {
-                $copy = epgProgrammeForChannel($outer, $ref);
-                if ($copy === $outer) {
-                    continue;
-                }
-                fwrite($handle, $copy . "\n");
-                $programmes++;
-            }
         });
     }
     fwrite($handle, "</tv>\n");
@@ -1859,7 +1806,7 @@ function epgGenerateXml(): array
         epgStateSet('generated_error', $e->getMessage());
         throw $e;
     }
-    $channels = count($wanted) + $aliasChannels;
+    $channels = count($wanted);
     epgStateSet('generated_at', epgNow());
     epgStateSet('generated_channels', (string) $channels);
     epgStateSet('generated_programmes', (string) $programmes);
