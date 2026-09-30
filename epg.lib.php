@@ -1747,7 +1747,6 @@ function epgGenerateXml(): array
         throw new RuntimeException('The temporary EPG file could not be created.');
     }
     fwrite($handle, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-    fwrite($handle, "<!DOCTYPE tv SYSTEM \"xmltv.dtd\">\n");
     fwrite($handle, "<tv generator-info-name=\"E2 naar M3U8\">\n");
     foreach (array_keys($wanted) as $id) {
         fwrite($handle, '  <channel id="' . epgXmlEscape($id) . "\">\n");
