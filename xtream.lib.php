@@ -60,7 +60,7 @@ function xtreamUserInfo(): array
         'active_cons' => '0',
         'created_at' => '1600000000',
         'max_connections' => '1',
-        'allowed_output_formats' => ['m3u8', 'ts'],
+        'allowed_output_formats' => ['ts'],
     ];
 }
 
@@ -259,12 +259,22 @@ function xtreamListStreams(int $categoryId): array
             'category_id' => (string) $row['category_id'],
             'custom_sid' => '',
             'tv_archive' => 0,
-            'direct_source' => (string) $row['stream_url'],
+            'direct_source' => xtreamDirectSource((string) $row['stream_url']),
             'tv_archive_duration' => 0,
         ];
     }
 
     return $streams;
+}
+
+function xtreamDirectSource(string $url): string
+{
+    $path = (string) (parse_url($url, PHP_URL_PATH) ?? '');
+    if (preg_match('/\.m3u8$/i', $path) === 1) {
+        return $url;
+    }
+
+    return '';
 }
 
 function xtreamStreamUrl(int $streamId): ?string
