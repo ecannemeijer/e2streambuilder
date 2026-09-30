@@ -1705,15 +1705,35 @@ function epgXmlEscape(string $value): string
     return htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
 }
 
-function epgProgrammeForChannel(string $outer, string $from, string $to): string
+function epgProgrammeForChannel(string $outer, string $to): string
 {
-    $pattern = '/(<programme\b[^>]*\bchannel=)([\'"])' . preg_quote($from, '/') . '\2/';
-    $replaced = preg_replace($pattern, '$1"' . epgXmlEscape($to) . '"', $outer, 1, $count);
-    if ($count === 1 && is_string($replaced)) {
-        return $replaced;
-    }
+    $replaced = preg_replace_callback(
+        '/<programme\b[^>]*>/',
+        static function (array $match) use ($to): string {
+            $tag = preg_replace(
+                '/\bchannel=(["\']).*?\1/',
+                'channel="' . epgXmlEscape($to) . '"',
+                $match[0],
+                1,
+                $count
+            );
 
-    return $outer;
+            return ($count === 1 && is_string($tag)) ? $tag : $match[0];
+        },
+        $outer,
+        1
+    );
+    if (!is_string($replaced) || $replaced === $outer) {
+        return $outer;
+    }
+    $replaced = preg_replace(
+        '/<(desc|credits|star-rating|review|video|audio|previously-shown)\b[^>]*>.*?<\/\1>\s*/s',
+        '',
+        $replaced
+    ) ?? $replaced;
+    $replaced = preg_replace('/<icon\b[^>]*\/>\s*/', '', $replaced) ?? $replaced;
+
+    return $replaced;
 }
 
 function epgGenerateXml(): array
@@ -1818,7 +1838,11 @@ function epgGenerateXml(): array
             fwrite($handle, $outer . "\n");
             $programmes++;
             foreach ($refsById[$channel] ?? [] as $ref => $bouquetName) {
-                fwrite($handle, epgProgrammeForChannel($outer, $channel, $ref) . "\n");
+                $copy = epgProgrammeForChannel($outer, $ref);
+                if ($copy === $outer) {
+                    continue;
+                }
+                fwrite($handle, $copy . "\n");
                 $programmes++;
             }
         });
