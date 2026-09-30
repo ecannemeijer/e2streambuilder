@@ -674,18 +674,22 @@ function epgXzBinary(): ?string
 {
     $candidates = [
         __DIR__ . '/bin/xz.exe',
+        __DIR__ . '/bin/xz',
         'C:\\Program Files\\Git\\mingw64\\bin\\xz.exe',
         'C:\\Program Files\\Git\\usr\\bin\\xz.exe',
+        '/usr/bin/xz',
+        '/bin/xz',
     ];
     foreach ($candidates as $path) {
         if (is_file($path)) {
             return $path;
         }
     }
-    $found = shell_exec('where xz 2>NUL');
+    $lookup = PHP_OS_FAMILY === 'Windows' ? 'where xz 2>NUL' : 'command -v xz 2>/dev/null';
+    $found = shell_exec($lookup);
     if (is_string($found)) {
         $first = strtok(trim($found), "\r\n");
-        if (is_string($first) && is_file($first)) {
+        if (is_string($first) && $first !== '' && is_file($first)) {
             return $first;
         }
     }
@@ -758,7 +762,10 @@ function epgUnpackXz(string $src, string $dest): void
 {
     $xz = epgXzBinary();
     if ($xz === null) {
-        throw new RuntimeException('No xz program found. Install Git or place xz.exe in the bin folder.');
+        $hint = PHP_OS_FAMILY === 'Windows'
+            ? 'Install Git or place xz.exe in the bin folder.'
+            : 'Install the xz package.';
+        throw new RuntimeException('No xz program found. ' . $hint);
     }
     $out = fopen($dest, 'wb');
     if ($out === false) {
@@ -767,7 +774,7 @@ function epgUnpackXz(string $src, string $dest): void
     $pipes = [];
     $process = proc_open(
         [$xz, '-dc', '--', $src],
-        [0 => ['file', 'NUL', 'r'], 1 => $out, 2 => ['pipe', 'w']],
+        [0 => ['file', PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null', 'r'], 1 => $out, 2 => ['pipe', 'w']],
         $pipes,
         dirname($xz)
     );
