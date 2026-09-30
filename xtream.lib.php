@@ -269,16 +269,12 @@ function xtreamListStreams(int $categoryId): array
 
 function xtreamDirectSource(string $url): string
 {
-    $path = (string) (parse_url($url, PHP_URL_PATH) ?? '');
-    if (preg_match('/\.(m3u8|ts)$/i', $path) === 1) {
-        return $url;
-    }
     $hash = strpos($url, '#');
     if ($hash !== false) {
         $url = substr($url, 0, $hash);
     }
 
-    return $url . '#.ts';
+    return $url;
 }
 
 function xtreamStreamUrl(int $streamId): ?string
