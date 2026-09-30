@@ -12,9 +12,9 @@ if (!is_file($path)) {
     exit;
 }
 
-header('Content-Type: ' . ($gz ? 'application/gzip' : 'application/xml; charset=utf-8'));
+header('Content-Type: ' . ($gz ? 'application/octet-stream' : 'application/xml; charset=utf-8'));
 header('Content-Disposition: inline; filename="' . ($gz ? 'epg.xml.gz' : 'epg.xml') . '"');
 header('Content-Length: ' . (string) filesize($path));
-header('Cache-Control: public, max-age=300');
+header('Cache-Control: no-store');
 epgKickUpdateIfDue();
 readfile($path);
