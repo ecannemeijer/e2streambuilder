@@ -71,7 +71,13 @@ The theme menu in the navigation switches Dark, Light, Ocean, and Amber. The cho
 
 ## Automatic update
 
-The guide refreshes once per interval when the playlist or the EPG is requested. Change the interval on the EPG page. For a fixed time, schedule `epg-update.bat` in Task Scheduler. `epg-update.php --force` runs an update immediately from the command line.
+The guide refreshes once per interval when the playlist or the EPG is requested. Change the interval on the EPG page. For a fixed time on Windows, schedule `epg-update.bat` in Task Scheduler. `epg-update.php --force` runs an EPG update immediately from the command line.
+
+On Linux, `xtream-update.php` downloads every enabled EPG source and then rebuilds the Xtream channel list and guide. Run it as the web user so `data/` stays writable. A nightly cron at 03:15 looks like this, with the clone path filled in:
+
+```cron
+15 3 * * * www-data /usr/bin/php /path/to/e2streambuilder/xtream-update.php >> /path/to/e2streambuilder/data/epg/cron.log 2>&1
+```
 
 ## How it works
 
