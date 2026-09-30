@@ -606,7 +606,8 @@ function disambiguatePlaylistRows(array $rows): array
  */
 function writePlaylist(array $services, ?array $selectedRefs, string $type): int
 {
-    echo "#EXTM3U\n";
+    $epg = mediaUrls()['epg'];
+    echo '#EXTM3U url-tvg="' . $epg . '" x-tvg-url="' . $epg . "\"\n";
     $count = 0;
     $tvgIds = playlistTvgIds();
     foreach (playlistRows($services, $selectedRefs, $type) as $row) {
