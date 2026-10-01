@@ -1752,7 +1752,21 @@ function epgGenerateXml(): array
         fwrite($handle, '  <channel id="' . epgXmlEscape($id) . "\">\n");
         $display = isset($meta[$id]) ? (string) $meta[$id]['display_name'] : ($names[$id] ?? $id);
         fwrite($handle, '    <display-name>' . epgXmlEscape($display) . "</display-name>\n");
-        $icon = logoUrlForXmltvId($id);
+        $iconLabels = [$display];
+        if (isset($names[$id])) {
+            $iconLabels[] = $names[$id];
+        }
+        if (isset($meta[$id])) {
+            $iconAlts = json_decode((string) $meta[$id]['alt_names'], true);
+            if (is_array($iconAlts)) {
+                foreach ($iconAlts as $iconAlt) {
+                    if (is_string($iconAlt) && $iconAlt !== '') {
+                        $iconLabels[] = $iconAlt;
+                    }
+                }
+            }
+        }
+        $icon = logoUrlForXmltvId($id, $iconLabels);
         if ($icon === '' && isset($meta[$id])) {
             $icon = trim((string) ($meta[$id]['icon'] ?? ''));
         }

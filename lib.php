@@ -616,7 +616,7 @@ function writePlaylist(array $services, ?array $selectedRefs, string $type): int
         $tvgId = $tvgIds[$row['sref'] ?? ''] ?? '';
         if ($tvgId !== '') {
             $attrs .= ' tvg-id="' . m3uText($tvgId) . '"';
-            $logo = logoUrlForXmltvId($tvgId);
+            $logo = logoUrlForXmltvId($tvgId, [$name]);
             if ($logo !== '') {
                 $attrs .= ' tvg-logo="' . m3uText($logo) . '"';
             }
@@ -746,7 +746,8 @@ function logoIndex(): array
     return $index;
 }
 
-function logoFileForXmltvId(string $id): ?string
+/** @return array{0: string, 1: string}|null */
+function logoIdParts(string $id): ?array
 {
     $id = strtolower(trim($id));
     $dot = strrpos($id, '.');
@@ -758,14 +759,187 @@ function logoFileForXmltvId(string $id): ?string
     if ($name === '' || $country === '') {
         return null;
     }
-    $index = logoIndex();
 
-    return $index[$name . '-' . $country . '.png'] ?? null;
+    return [$name, $country];
 }
 
-function logoUrlForXmltvId(string $id): string
+/** @return list<string> */
+function logoWords(string $text): array
 {
-    $file = logoFileForXmltvId($id);
+    $parts = preg_split('/[^a-z0-9]+/', strtolower($text), -1, PREG_SPLIT_NO_EMPTY);
+    if ($parts === false) {
+        return [];
+    }
+    $noise = ['hd' => true, 'sd' => true, 'uhd' => true, 'tv' => true, 'channel' => true];
+    $words = [];
+    foreach ($parts as $part) {
+        if (isset($noise[$part]) || ctype_digit($part) || strlen($part) < 2) {
+            continue;
+        }
+        $words[$part] = true;
+    }
+
+    return array_keys($words);
+}
+
+/**
+ * @param list<array{file: string, words: list<string>}> $logos
+ * @param list<string> $channelWords
+ */
+function logoPickByWords(array $channelWords, array $logos): ?string
+{
+    if ($channelWords === [] || $logos === []) {
+        return null;
+    }
+    $want = array_fill_keys($channelWords, true);
+    $bestFile = null;
+    $bestScore = 0;
+    $bestExtra = PHP_INT_MAX;
+    $tied = false;
+    $sharedWord = '';
+    foreach ($logos as $logo) {
+        $score = 0;
+        $only = '';
+        foreach ($logo['words'] as $word) {
+            if (isset($want[$word])) {
+                $score++;
+                $only = $word;
+            }
+        }
+        if ($score === 0) {
+            continue;
+        }
+        $extra = count($logo['words']) - $score;
+        $file = $logo['file'];
+        $better = $bestFile === null
+            || $score > $bestScore
+            || ($score === $bestScore && $extra < $bestExtra)
+            || ($score === $bestScore && $extra === $bestExtra && $file < $bestFile);
+        if ($better) {
+            $tied = false;
+            $bestScore = $score;
+            $bestExtra = $extra;
+            $bestFile = $file;
+            $sharedWord = $score === 1 ? $only : '';
+        } elseif ($score === $bestScore && $extra === $bestExtra) {
+            $tied = true;
+        }
+    }
+    if ($bestFile === null || $bestScore < 1) {
+        return null;
+    }
+    if ($bestScore >= 2) {
+        return $bestFile;
+    }
+    if ($tied || $sharedWord === '') {
+        return null;
+    }
+    $owners = 0;
+    foreach ($logos as $logo) {
+        if (in_array($sharedWord, $logo['words'], true)) {
+            $owners++;
+            if ($owners > 1) {
+                return null;
+            }
+        }
+    }
+
+    return $bestFile;
+}
+
+/** @return array<string, list<array{file: string, words: list<string>}>> */
+function logoCountryLogos(): array
+{
+    static $byCountry = null;
+    if (is_array($byCountry)) {
+        return $byCountry;
+    }
+    $byCountry = [];
+    foreach (logoIndex() as $basename => $relative) {
+        if (preg_match('/^(.+)-([a-z0-9]+)\.png$/', $basename, $match) !== 1) {
+            continue;
+        }
+        $words = logoWords($match[1]);
+        if ($words === []) {
+            continue;
+        }
+        $byCountry[$match[2]][] = [
+            'file' => $relative,
+            'words' => $words,
+        ];
+    }
+
+    return $byCountry;
+}
+
+/** @return array<string, list<string>> */
+function logoChannelLabels(): array
+{
+    static $loaded = false;
+    static $labels = [];
+    if ($loaded) {
+        return $labels;
+    }
+    $loaded = true;
+    if (!function_exists('epgDb')) {
+        $file = __DIR__ . '/epg.lib.php';
+        if (is_file($file)) {
+            require_once $file;
+        }
+    }
+    if (!function_exists('epgDb')) {
+        return $labels;
+    }
+    try {
+        foreach (epgDb()->query('SELECT xmltv_id, display_name, alt_names FROM epg_channels') as $row) {
+            $id = (string) $row['xmltv_id'];
+            $labels[$id][] = (string) $row['display_name'];
+            $alts = json_decode((string) $row['alt_names'], true);
+            if (!is_array($alts)) {
+                continue;
+            }
+            foreach ($alts as $alt) {
+                if (is_string($alt) && $alt !== '') {
+                    $labels[$id][] = $alt;
+                }
+            }
+        }
+        foreach (epgDb()->query("SELECT xmltv_id, service_name FROM epg_mappings
+            WHERE xmltv_id IS NOT NULL AND xmltv_id != ''") as $row) {
+            $labels[(string) $row['xmltv_id']][] = (string) $row['service_name'];
+        }
+    } catch (Throwable $e) {
+        $labels = [];
+    }
+
+    return $labels;
+}
+
+function logoFileForXmltvId(string $id, array $labels = []): ?string
+{
+    $parts = logoIdParts($id);
+    if ($parts === null) {
+        return null;
+    }
+    [$name, $country] = $parts;
+    $index = logoIndex();
+    $exact = $index[$name . '-' . $country . '.png'] ?? null;
+    if ($exact !== null) {
+        return $exact;
+    }
+    $words = [];
+    foreach (array_merge($labels, logoChannelLabels()[trim($id)] ?? []) as $label) {
+        foreach (logoWords((string) $label) as $word) {
+            $words[$word] = true;
+        }
+    }
+
+    return logoPickByWords(array_keys($words), logoCountryLogos()[$country] ?? []);
+}
+
+function logoUrlForXmltvId(string $id, array $labels = []): string
+{
+    $file = logoFileForXmltvId($id, $labels);
     if ($file === null) {
         return '';
     }

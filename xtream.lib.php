@@ -253,7 +253,7 @@ function xtreamListStreams(int $categoryId): array
             'name' => (string) $row['name'],
             'stream_type' => 'live',
             'stream_id' => (int) $row['stream_id'],
-            'stream_icon' => logoUrlForXmltvId((string) $row['epg_channel_id']),
+            'stream_icon' => logoUrlForXmltvId((string) $row['epg_channel_id'], [(string) $row['name']]),
             'epg_channel_id' => (string) $row['epg_channel_id'],
             'added' => (string) $row['added_at'],
             'category_id' => (string) $row['category_id'],
