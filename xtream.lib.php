@@ -248,13 +248,19 @@ function xtreamListStreams(int $categoryId): array
     $num = 0;
     foreach ($stmt as $row) {
         $num++;
+        $name = (string) $row['name'];
+        $epgId = (string) $row['epg_channel_id'];
+        $icon = logoUrlForXmltvId($epgId, [$name]);
+        if ($icon === '') {
+            $icon = logoUrlForLabel($name);
+        }
         $streams[] = [
             'num' => $num,
-            'name' => (string) $row['name'],
+            'name' => $name,
             'stream_type' => 'live',
             'stream_id' => (int) $row['stream_id'],
-            'stream_icon' => logoUrlForXmltvId((string) $row['epg_channel_id'], [(string) $row['name']]),
-            'epg_channel_id' => (string) $row['epg_channel_id'],
+            'stream_icon' => $icon,
+            'epg_channel_id' => $epgId,
             'added' => (string) $row['added_at'],
             'category_id' => (string) $row['category_id'],
             'custom_sid' => '',

@@ -614,12 +614,15 @@ function writePlaylist(array $services, ?array $selectedRefs, string $type): int
         $name = $row['name'];
         $attrs = '';
         $tvgId = $tvgIds[$row['sref'] ?? ''] ?? '';
+        $logo = $tvgId !== '' ? logoUrlForXmltvId($tvgId, [$name]) : '';
+        if ($logo === '') {
+            $logo = logoUrlForLabel($name);
+        }
         if ($tvgId !== '') {
             $attrs .= ' tvg-id="' . m3uText($tvgId) . '"';
-            $logo = logoUrlForXmltvId($tvgId, [$name]);
-            if ($logo !== '') {
-                $attrs .= ' tvg-logo="' . m3uText($logo) . '"';
-            }
+        }
+        if ($logo !== '') {
+            $attrs .= ' tvg-logo="' . m3uText($logo) . '"';
         }
         echo '#EXTINF:-1' . $attrs . ' tvg-name="' . $name . '" group-title="' . $row['group'] . '",' . $name . "\n";
         echo $row['url'] . "\n";
@@ -937,13 +940,69 @@ function logoFileForXmltvId(string $id, array $labels = []): ?string
     return logoPickByWords(array_keys($words), logoCountryLogos()[$country] ?? []);
 }
 
-function logoUrlForXmltvId(string $id, array $labels = []): string
+function logoFileForLabel(string $label): ?string
 {
-    $file = logoFileForXmltvId($id, $labels);
-    if ($file === null) {
+    $words = logoWords($label);
+    if ($words === []) {
+        return null;
+    }
+    $want = array_fill_keys($words, true);
+    $bestFile = null;
+    $bestScore = 0;
+    $bestExtra = PHP_INT_MAX;
+    $bestCountryRank = PHP_INT_MAX;
+    $all = [];
+    foreach (logoCountryLogos() as $country => $logos) {
+        $countryRank = $country === 'nl' ? 0 : 1;
+        foreach ($logos as $logo) {
+            $all[] = $logo;
+            $score = 0;
+            foreach ($logo['words'] as $word) {
+                if (isset($want[$word])) {
+                    $score++;
+                }
+            }
+            if ($score < 2) {
+                continue;
+            }
+            $extra = count($logo['words']) - $score;
+            $file = $logo['file'];
+            $better = $bestFile === null
+                || $score > $bestScore
+                || ($score === $bestScore && $extra < $bestExtra)
+                || ($score === $bestScore && $extra === $bestExtra && $countryRank < $bestCountryRank)
+                || ($score === $bestScore && $extra === $bestExtra && $countryRank === $bestCountryRank && $file < $bestFile);
+            if ($better) {
+                $bestFile = $file;
+                $bestScore = $score;
+                $bestExtra = $extra;
+                $bestCountryRank = $countryRank;
+            }
+        }
+    }
+    if ($bestFile !== null) {
+        return $bestFile;
+    }
+
+    return logoPickByWords($words, $all);
+}
+
+function logoUrlForFile(?string $file): string
+{
+    if ($file === null || $file === '') {
         return '';
     }
     $parts = array_map('rawurlencode', explode('/', $file));
 
     return appBaseUrl() . '/logos/' . implode('/', $parts);
+}
+
+function logoUrlForXmltvId(string $id, array $labels = []): string
+{
+    return logoUrlForFile(logoFileForXmltvId($id, $labels));
+}
+
+function logoUrlForLabel(string $label): string
+{
+    return logoUrlForFile(logoFileForLabel($label));
 }
