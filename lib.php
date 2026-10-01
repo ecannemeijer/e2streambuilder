@@ -776,7 +776,7 @@ function logoWords(string $text): array
     $noise = ['hd' => true, 'sd' => true, 'uhd' => true, 'tv' => true, 'channel' => true];
     $words = [];
     foreach ($parts as $part) {
-        if (isset($noise[$part]) || ctype_digit($part) || strlen($part) < 2) {
+        if (isset($noise[$part]) || ctype_digit($part) || strlen($part) < 3) {
             continue;
         }
         $words[$part] = true;
