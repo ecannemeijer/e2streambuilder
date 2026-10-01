@@ -1,3 +1,6 @@
 # Receiver settings, downloaded EPG files, the generated guide, logs, and SQLite.
 /data/*
 !/data/.htaccess
+
+# Channel logos cloned from tv-logo/tv-logos. Not part of this app.
+/logos/

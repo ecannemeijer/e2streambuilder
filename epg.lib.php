@@ -1752,6 +1752,13 @@ function epgGenerateXml(): array
         fwrite($handle, '  <channel id="' . epgXmlEscape($id) . "\">\n");
         $display = isset($meta[$id]) ? (string) $meta[$id]['display_name'] : ($names[$id] ?? $id);
         fwrite($handle, '    <display-name>' . epgXmlEscape($display) . "</display-name>\n");
+        $icon = logoUrlForXmltvId($id);
+        if ($icon === '' && isset($meta[$id])) {
+            $icon = trim((string) ($meta[$id]['icon'] ?? ''));
+        }
+        if ($icon !== '') {
+            fwrite($handle, '    <icon src="' . epgXmlEscape($icon) . "\"/>\n");
+        }
         if (isset($meta[$id])) {
             $alts = json_decode((string) $meta[$id]['alt_names'], true);
             if (is_array($alts)) {
@@ -1760,10 +1767,6 @@ function epgGenerateXml(): array
                         fwrite($handle, '    <display-name>' . epgXmlEscape($alt) . "</display-name>\n");
                     }
                 }
-            }
-            $icon = trim((string) ($meta[$id]['icon'] ?? ''));
-            if ($icon !== '') {
-                fwrite($handle, '    <icon src="' . epgXmlEscape($icon) . "\"/>\n");
             }
         }
         fwrite($handle, "  </channel>\n");

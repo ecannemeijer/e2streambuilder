@@ -616,6 +616,10 @@ function writePlaylist(array $services, ?array $selectedRefs, string $type): int
         $tvgId = $tvgIds[$row['sref'] ?? ''] ?? '';
         if ($tvgId !== '') {
             $attrs .= ' tvg-id="' . m3uText($tvgId) . '"';
+            $logo = logoUrlForXmltvId($tvgId);
+            if ($logo !== '') {
+                $attrs .= ' tvg-logo="' . m3uText($logo) . '"';
+            }
         }
         echo '#EXTINF:-1' . $attrs . ' tvg-name="' . $name . '" group-title="' . $row['group'] . '",' . $name . "\n";
         echo $row['url'] . "\n";
@@ -665,8 +669,31 @@ function channelsForBouquet(string $ref): array
 
 function appBaseUrl(): string
 {
+    if (!empty($_SERVER['HTTP_HOST'])) {
+        $base = requestBaseUrl();
+        $raw = loadSettingsRaw();
+        if (($raw['public_base'] ?? '') !== $base) {
+            $raw['public_base'] = $base;
+            try {
+                saveSettingsRaw($raw);
+            } catch (Throwable $e) {
+            }
+        }
+
+        return $base;
+    }
+    $stored = trim((string) (loadSettingsRaw()['public_base'] ?? ''));
+    if ($stored !== '') {
+        return rtrim($stored, '/');
+    }
+
+    return 'http://openwebif.test';
+}
+
+function requestBaseUrl(): string
+{
     $https = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on';
-    $host = $_SERVER['HTTP_HOST'] ?? 'openwebif.test';
+    $host = (string) $_SERVER['HTTP_HOST'];
     $dir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
     $dir = rtrim($dir, '/');
     if ($dir === '/' || $dir === '.') {
@@ -674,4 +701,75 @@ function appBaseUrl(): string
     }
 
     return ($https ? 'https' : 'http') . '://' . $host . $dir;
+}
+
+function logoDir(): string
+{
+    return __DIR__ . '/logos';
+}
+
+/** @return array<string, string> basename => path under logos/ */
+function logoIndex(): array
+{
+    static $index = null;
+    if (is_array($index)) {
+        return $index;
+    }
+    $index = [];
+    $root = logoDir();
+    if (!is_dir($root)) {
+        return $index;
+    }
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS)
+    );
+    foreach ($iterator as $file) {
+        if (!$file instanceof SplFileInfo || !$file->isFile()) {
+            continue;
+        }
+        if (strcasecmp($file->getExtension(), 'png') !== 0) {
+            continue;
+        }
+        $path = $file->getPathname();
+        if (str_contains($path, DIRECTORY_SEPARATOR . '.git' . DIRECTORY_SEPARATOR)) {
+            continue;
+        }
+        $name = strtolower($file->getFilename());
+        $relative = str_replace('\\', '/', substr($path, strlen($root) + 1));
+        $prefer = !isset($index[$name])
+            || (str_starts_with($relative, 'countries/') && !str_starts_with($index[$name], 'countries/'));
+        if ($prefer) {
+            $index[$name] = $relative;
+        }
+    }
+
+    return $index;
+}
+
+function logoFileForXmltvId(string $id): ?string
+{
+    $id = strtolower(trim($id));
+    $dot = strrpos($id, '.');
+    if ($dot === false || $dot === 0 || $dot === strlen($id) - 1) {
+        return null;
+    }
+    $name = preg_replace('/[^a-z0-9]+/', '', substr($id, 0, $dot)) ?? '';
+    $country = preg_replace('/[^a-z0-9]+/', '', substr($id, $dot + 1)) ?? '';
+    if ($name === '' || $country === '') {
+        return null;
+    }
+    $index = logoIndex();
+
+    return $index[$name . '-' . $country . '.png'] ?? null;
+}
+
+function logoUrlForXmltvId(string $id): string
+{
+    $file = logoFileForXmltvId($id);
+    if ($file === null) {
+        return '';
+    }
+    $parts = array_map('rawurlencode', explode('/', $file));
+
+    return appBaseUrl() . '/logos/' . implode('/', $parts);
 }
