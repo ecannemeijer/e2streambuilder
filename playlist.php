@@ -5,32 +5,11 @@ require_once __DIR__ . '/lib.php';
 set_time_limit(120);
 ini_set('memory_limit', '256M');
 
-function publishedPlaylistPath(): string
-{
-    return __DIR__ . '/data/channels.m3u8';
-}
-
 function requestWantsPublishedPlaylist(): bool
 {
     $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
 
     return is_string($path) && preg_match('#/channels\.m3u8$#', $path) === 1;
-}
-
-function savePublishedPlaylist(string $body): void
-{
-    $path = publishedPlaylistPath();
-    $dir = dirname($path);
-    if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
-        return;
-    }
-    $tmp = $path . '.tmp';
-    if (file_put_contents($tmp, $body, LOCK_EX) === false) {
-        return;
-    }
-    if (!rename($tmp, $path)) {
-        @unlink($tmp);
-    }
 }
 
 $publishedPath = publishedPlaylistPath();

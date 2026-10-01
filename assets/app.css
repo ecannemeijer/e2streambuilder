@@ -332,6 +332,7 @@ video {
 .links a { color: var(--accent); word-break: break-all; }
 
 .nav { display: flex; flex-wrap: wrap; gap: 8px; }
+.nav form { display: contents; }
 .nav a {
     color: var(--muted);
     text-decoration: none;
