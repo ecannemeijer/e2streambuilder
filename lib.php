@@ -20,6 +20,11 @@ function appNav(string $active): void
         echo '<a' . $class . ' href="' . h($item[1]) . '">' . h($item[0]) . '</a>';
     }
     echo '<button class="nav-btn" type="button" id="xtream-open">Xtream</button>';
+    $eitClass = $active === 'eit' ? ' class="active"' : '';
+    echo '<a' . $eitClass . ' href="eit.php">EIT</a>';
+    echo '<form method="post" action="create-all.php">';
+    echo '<button class="nav-btn" type="submit" name="create_all" value="1">Create All</button>';
+    echo '</form>';
     echo '<label class="theme"><span>Theme</span><select id="theme">';
     foreach (['dark' => 'Dark', 'light' => 'Light', 'ocean' => 'Ocean', 'amber' => 'Amber'] as $value => $label) {
         echo '<option value="' . h($value) . '">' . h($label) . '</option>';
@@ -101,9 +106,15 @@ document.addEventListener("DOMContentLoaded",function(){
     var target=form.getAttribute("action")||"";
     var isDownload=action==="download_source"||action==="refresh";
     var isXtream=target.indexOf("xtream-build.php")!==-1;
-    if(!isDownload&&!isXtream)return false;
+    var isCreate=target.indexOf("create-all.php")!==-1;
+    var isEit=action==="build_eit";
+    if(!isDownload&&!isXtream&&!isCreate&&!isEit)return false;
     event.preventDefault();
-    showLoading(isXtream?"Starting the Xtream build…":"Starting the EPG download…");
+    var startText="Starting the EPG download…";
+    if(isXtream)startText="Starting the Xtream build…";
+    if(isCreate)startText="Reading channels from the receiver…";
+    if(isEit)startText="Reading the receiver guide…";
+    showLoading(startText);
     var body=new FormData(form);
     if(submitter&&submitter.name)body.append(submitter.name,submitter.value);
     body.append("progress","1");
@@ -159,10 +170,10 @@ document.addEventListener("DOMContentLoaded",function(){
       showLoading();
     });
   });
-  if(/(?:^|\\/)epg(?:-mapping)?\\.php$/.test(location.pathname)){
+  if(/(?:^|\\/)(?:epg(?:-mapping)?|eit)\\.php$/.test(location.pathname)){
     document.querySelectorAll("form").forEach(onWork);
   }
-  document.querySelectorAll("form.slow").forEach(onWork);
+  document.querySelectorAll("form.slow,form[action=\\"create-all.php\\"]").forEach(onWork);
 });
 </script>';
 }
@@ -176,14 +187,15 @@ function appChrome(): void
     echo '<p>This site turns your Enigma2 receiver into a playlist for TiviMate, and adds a programme guide.</p>';
     echo '<ol>';
     echo '<li>Set the receiver IP on the Playlist page and save.</li>';
-    echo '<li>Copy the M3U URL into TiviMate as a playlist.</li>';
+    echo '<li>Copy the M3U URL (<code>channels.m3u8</code>) into TiviMate as a playlist. Its first line points at the guide, so updating the playlist also loads the EPG.</li>';
     echo '<li>Copy the EPG URL into TiviMate as an XMLTV source. Use the <code>.gz</code> address.</li>';
-    echo '<li>TiviMate matches the guide with <code>tvg-id</code>. That id is the same as the channel id in the XMLTV file.</li>';
+    echo '<li>TiviMate matches the guide with <code>tvg-id</code>. That id is the Rytec channel id, for example <code>NPO1.nl</code>. Playback goes straight to the receiver.</li>';
     echo '</ol>';
-    echo '<p><strong>Download this source</strong> fetches only that country file. <strong>Download all</strong> fetches every enabled source, matches your channels, and rebuilds the guide.</p>';
+    echo '<p><strong>Download this source</strong> fetches only that country file. <strong>Download all</strong> fetches every enabled source, matches your channels, and rebuilds the guide. The spinner shows the current step.</p>';
+    echo '<p>Logos come from the tv-logos collection in <code>logos/</code>. An exact filename wins, such as <code>npo1-nl.png</code> for <code>NPO1.nl</code>. Otherwise the logo that shares the most words with the channel name is used. Short pieces such as <code>Jr</code> are ignored, so Veronica / Disney Jr. uses <code>veronica-disney-xd-nl.png</code>. A channel with no matching file stays without a logo. The same address is the guide icon, the playlist <code>tvg-logo</code>, and the Xtream stream icon.</p>';
     echo '<p>On EPG mapping you can correct a wrong link. A manual link is kept and always wins over automatic matching.</p>';
-    echo '<p>The guide refreshes once per interval when the playlist or EPG is requested. For a fixed time, schedule <code>epg-update.bat</code>.</p>';
-    echo '<p><strong>Xtream Codes:</strong> press <strong>Xtream</strong> next to EPG mapping. Build the list there, then in TiviMate add a playlist, choose Xtream Codes, and paste the server URL, username and password. Channel order follows the bouquet list on the receiver.</p>';
+    echo '<p>The guide refreshes once per interval when the playlist or EPG is requested. On Linux, <code>xtream-update.php</code> does the nightly download and Xtream rebuild. The public address is remembered from the last time the site was opened.</p>';
+    echo '<p><strong>Xtream Codes:</strong> press <strong>Xtream</strong> next to EPG mapping. Build the list there, then in TiviMate add a playlist, choose Xtream Codes, and paste the server URL, username and password. Channel order follows the bouquet list on the receiver. TiviMate asks this server for the stream, and the server redirects to the receiver.</p>';
     echo '<p>More detail is in <code>README.md</code>.</p>';
     echo '<button class="btn primary" type="button" data-close-help>Close</button>';
     echo '</div></div>';
@@ -252,17 +264,18 @@ function mediaUrls(): array
         'playlist' => $base . '/playlist.php',
         'epg' => $base . '/epg.xml.gz',
         'epg_plain' => $base . '/epg.xml',
+        'eit' => $base . '/epg-eit.xml.gz',
     ];
 }
 
-function webifGet(string $path): string
+function webifGet(string $path, int $timeout = 90): string
 {
     $settings = receiverSettings();
     $url = 'http://' . $settings['host'] . ':' . $settings['webif_port'] . $path;
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 90,
+        CURLOPT_TIMEOUT => $timeout,
         CURLOPT_CONNECTTIMEOUT => 8,
         CURLOPT_HTTPHEADER => ['Accept: application/json'],
     ]);
@@ -281,9 +294,9 @@ function webifGet(string $path): string
     return $body;
 }
 
-function webifJson(string $path): array
+function webifJson(string $path, int $timeout = 90): array
 {
-    $data = json_decode(webifGet($path), true);
+    $data = json_decode(webifGet($path, $timeout), true);
     if (!is_array($data)) {
         throw new RuntimeException('The receiver did not return valid JSON.');
     }
@@ -630,6 +643,27 @@ function writePlaylist(array $services, ?array $selectedRefs, string $type): int
     }
 
     return $count;
+}
+
+function publishedPlaylistPath(): string
+{
+    return __DIR__ . '/data/channels.m3u8';
+}
+
+function savePublishedPlaylist(string $body): void
+{
+    $path = publishedPlaylistPath();
+    $dir = dirname($path);
+    if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+        return;
+    }
+    $tmp = $path . '.tmp';
+    if (file_put_contents($tmp, $body, LOCK_EX) === false) {
+        return;
+    }
+    if (!rename($tmp, $path)) {
+        @unlink($tmp);
+    }
 }
 
 /**

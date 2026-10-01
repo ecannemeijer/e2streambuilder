@@ -55,6 +55,16 @@ function epgGzPath(): string
     return epgDir() . '/out/epg.xml.gz';
 }
 
+function eitXmlPath(): string
+{
+    return epgDir() . '/out/epg-eit.xml';
+}
+
+function eitGzPath(): string
+{
+    return epgDir() . '/out/epg-eit.xml.gz';
+}
+
 function epgLog(string $message): void
 {
     try {
@@ -1856,6 +1866,151 @@ function epgGzipFile(string $src, string $dest): void
     fclose($in);
     gzclose($out);
     epgAtomicReplace($tmp, $dest);
+}
+
+function eitReceiverNow(): int
+{
+    $now = time();
+    try {
+        $clock = webifJson('/api/currenttime', 15);
+    } catch (Throwable $e) {
+        return $now;
+    }
+    $time = (string) ($clock['time'] ?? '');
+    if (preg_match('/^(\d{1,2}):(\d{2}):(\d{2})$/', $time, $match) !== 1) {
+        return $now;
+    }
+    $box = ((int) $match[1]) * 3600 + ((int) $match[2]) * 60 + (int) $match[3];
+    $here = ((int) date('G', $now)) * 3600 + ((int) date('i', $now)) * 60 + (int) date('s', $now);
+    $delta = $box - $here;
+    if ($delta > 12 * 3600) {
+        $delta -= 86400;
+    }
+    if ($delta < -12 * 3600) {
+        $delta += 86400;
+    }
+
+    return $now + $delta;
+}
+
+function eitGenerateToday(): array
+{
+    @ini_set('memory_limit', '512M');
+    epgLog('Reading the receiver clock');
+    $now = eitReceiverNow();
+    $start = strtotime(date('Y-m-d 00:00:00', $now));
+    if ($start === false) {
+        $start = $now - ($now % 86400);
+    }
+    $end = $start + 86400;
+    epgLog('Reading channels from the receiver');
+    $rows = playlistRows(fetchAllServices(), null, 'all');
+    $tvg = epgTvgIdMap();
+    $bouquets = [];
+    $names = [];
+    foreach ($rows as $row) {
+        $sref = (string) ($row['sref'] ?? '');
+        $xmltv = $tvg[$sref] ?? '';
+        if ($sref === '' || $xmltv === '') {
+            continue;
+        }
+        $group = (string) ($row['group'] ?? 'Bouquet');
+        $bouquets[$group][$sref] = $xmltv;
+        if (!isset($names[$xmltv])) {
+            $names[$xmltv] = (string) ($row['match_name'] ?? $row['name'] ?? $xmltv);
+        }
+    }
+    $events = [];
+    $seenRef = [];
+    foreach ($bouquets as $group => $channels) {
+        epgLog('Reading bouquet ' . $group);
+        foreach ($channels as $sref => $xmltv) {
+            if (isset($seenRef[$sref])) {
+                continue;
+            }
+            $seenRef[$sref] = true;
+            try {
+                $data = webifJson(
+                    '/api/epgservice?sRef=' . rawurlencode($sref) . '&time=' . $start . '&endTime=' . $end,
+                    25
+                );
+            } catch (Throwable $e) {
+                epgLog('Skipped ' . $names[$xmltv] . ': ' . $e->getMessage());
+                continue;
+            }
+            foreach ($data['events'] ?? [] as $event) {
+                if (!is_array($event)) {
+                    continue;
+                }
+                $begin = (int) ($event['begin_timestamp'] ?? 0);
+                $duration = (int) ($event['duration_sec'] ?? 0);
+                $title = trim((string) ($event['title'] ?? ''));
+                if ($begin <= 0 || $duration <= 0 || $title === '' || strcasecmp($title, 'N/A') === 0) {
+                    continue;
+                }
+                if ($begin >= $end || ($begin + $duration) <= $start) {
+                    continue;
+                }
+                $desc = trim((string) ($event['longdesc'] ?? ''));
+                if ($desc === '') {
+                    $desc = trim((string) ($event['shortdesc'] ?? ''));
+                }
+                $key = $xmltv . '|' . $begin . '|' . $duration;
+                $events[$key] = [
+                    'channel' => $xmltv,
+                    'begin' => $begin,
+                    'stop' => $begin + $duration,
+                    'title' => $title,
+                    'desc' => $desc,
+                ];
+            }
+        }
+    }
+    epgEnsureDirs();
+    epgLog('Generating epg-eit.xml');
+    $tmp = eitXmlPath() . '.tmp';
+    $handle = fopen($tmp, 'wb');
+    if ($handle === false) {
+        throw new RuntimeException('The temporary EIT file could not be created.');
+    }
+    fwrite($handle, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    fwrite($handle, "<tv generator-info-name=\"E2 naar M3U8\">\n");
+    foreach ($names as $id => $display) {
+        fwrite($handle, '  <channel id="' . epgXmlEscape($id) . "\">\n");
+        fwrite($handle, '    <display-name>' . epgXmlEscape($display) . "</display-name>\n");
+        fwrite($handle, "  </channel>\n");
+    }
+    foreach ($events as $event) {
+        $startText = gmdate('YmdHis', $event['begin']) . ' +0000';
+        $stopText = gmdate('YmdHis', $event['stop']) . ' +0000';
+        fwrite($handle, '  <programme start="' . $startText . '" stop="' . $stopText . '" channel="' . epgXmlEscape($event['channel']) . "\">\n");
+        fwrite($handle, '    <title>' . epgXmlEscape($event['title']) . "</title>\n");
+        if ($event['desc'] !== '') {
+            fwrite($handle, '    <desc>' . epgXmlEscape($event['desc']) . "</desc>\n");
+        }
+        fwrite($handle, "  </programme>\n");
+    }
+    fwrite($handle, "</tv>\n");
+    fclose($handle);
+    try {
+        epgAtomicReplace($tmp, eitXmlPath());
+        epgGzipFile(eitXmlPath(), eitGzPath());
+        epgLog('Generating epg-eit.xml.gz');
+    } catch (Throwable $e) {
+        @unlink($tmp);
+        epgStateSet('eit_error', $e->getMessage());
+        throw $e;
+    }
+    $channelCount = count($names);
+    $programmeCount = count($events);
+    epgStateSet('eit_generated_at', epgNow());
+    epgStateSet('eit_channels', (string) $channelCount);
+    epgStateSet('eit_programmes', (string) $programmeCount);
+    epgStateSet('eit_error', '');
+    epgLog('EIT channels: ' . $channelCount);
+    epgLog('EIT programmes: ' . $programmeCount);
+
+    return ['channels' => $channelCount, 'programmes' => $programmeCount];
 }
 
 function epgHistoryStart(string $trigger): int
