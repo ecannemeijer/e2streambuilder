@@ -1,5 +1,6 @@
 RewriteEngine On
 RewriteRule ^live/([^/]+)/([^/]+)/([0-9]+)\.(ts|m3u8)$ xtream-live.php?user=$1&pass=$2&id=$3&ext=$4 [B,L,QSA]
+RewriteRule ^u/([a-f0-9]{32})/channels\.m3u8$ user-playlist.php?token=$1 [L]
 RewriteRule ^channels\.m3u8?$ playlist.php [QSA,L]
 RewriteRule ^epg-eit\.xml\.gz$ epg-xml.php?gz=1&eit=1 [L]
 RewriteRule ^epg-eit\.xml$ epg-xml.php?eit=1 [L]

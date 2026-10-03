@@ -274,6 +274,17 @@ function epgMigrate(PDO $db): void
         }
         $db->exec('INSERT INTO epg_schema (version) VALUES (3)');
     }
+    if ($version < 4) {
+        $db->exec('CREATE TABLE IF NOT EXISTS homes (
+            token TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            stream_port INTEGER NOT NULL DEFAULT 8001,
+            host TEXT NOT NULL DEFAULT \'\',
+            created_at TEXT NOT NULL,
+            built_at TEXT
+        )');
+        $db->exec('INSERT INTO epg_schema (version) VALUES (4)');
+    }
     epgSeedSources();
 }
 
@@ -290,6 +301,144 @@ function epgStateSet(string $key, string $value): void
 {
     epgDb()->prepare('INSERT INTO epg_state (key, value) VALUES (?, ?)
         ON CONFLICT(key) DO UPDATE SET value = excluded.value')->execute([$key, $value]);
+}
+
+function homeTokenOk(string $token): bool
+{
+    return preg_match('/^[a-f0-9]{32}$/', $token) === 1;
+}
+
+function homeHostOk(string $host): bool
+{
+    if ($host === '' || strlen($host) > 253 || strpbrk($host, "/\\ \t\r\n") !== false) {
+        return false;
+    }
+    if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+        return true;
+    }
+
+    return preg_match('/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/', $host) === 1;
+}
+
+function homePlaylistPath(string $token): string
+{
+    return __DIR__ . '/data/users/' . $token . '.m3u8';
+}
+
+function homeCreate(string $name, int $streamPort): array
+{
+    $name = trim($name);
+    if ($name === '' || strlen($name) > 80) {
+        throw new InvalidArgumentException('Enter a house name of up to 80 characters.');
+    }
+    if ($streamPort < 1 || $streamPort > 65535) {
+        throw new InvalidArgumentException('The stream port must be between 1 and 65535.');
+    }
+    $token = bin2hex(random_bytes(16));
+    $now = epgNow();
+    epgDb()->prepare('INSERT INTO homes (token, name, stream_port, host, created_at) VALUES (?, ?, ?, \'\', ?)')
+        ->execute([$token, $name, $streamPort, $now]);
+    $home = homeByToken($token);
+    if ($home === null) {
+        throw new RuntimeException('The house could not be saved.');
+    }
+
+    return $home;
+}
+
+function homeDelete(string $token): void
+{
+    if (!homeTokenOk($token)) {
+        return;
+    }
+    epgDb()->prepare('DELETE FROM homes WHERE token = ?')->execute([$token]);
+    $path = homePlaylistPath($token);
+    if (is_file($path)) {
+        @unlink($path);
+    }
+}
+
+function homeByToken(string $token): ?array
+{
+    if (!homeTokenOk($token)) {
+        return null;
+    }
+    $stmt = epgDb()->prepare('SELECT token, name, stream_port, host, created_at, built_at FROM homes WHERE token = ?');
+    $stmt->execute([$token]);
+    $row = $stmt->fetch();
+
+    return is_array($row) ? $row : null;
+}
+
+/** @return list<array<string, mixed>> */
+function homeList(): array
+{
+    $rows = [];
+    foreach (epgDb()->query('SELECT token, name, stream_port, host, created_at, built_at FROM homes ORDER BY created_at ASC, name ASC') as $row) {
+        $rows[] = $row;
+    }
+
+    return $rows;
+}
+
+function homeMarkBuilt(string $token, string $host): void
+{
+    epgDb()->prepare('UPDATE homes SET host = ?, built_at = ? WHERE token = ?')
+        ->execute([$host, epgNow(), $token]);
+}
+
+function homeBookmarklet(string $token): string
+{
+    $base = appBaseUrl();
+    $script = '(function(){var token=' . json_encode($token) . ';var base=' . json_encode($base) . ';'
+        . 'fetch("/api/getallservices",{headers:{Accept:"application/json"}}).then(function(r){if(!r.ok)throw new Error("The receiver did not return the channel list.");return r.json();})'
+        . '.then(function(data){return fetch(base+"/publish.php",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:token,host:location.hostname,services:data})});})'
+        . '.then(function(r){return r.json().then(function(body){if(!r.ok)throw new Error(body.message||"Publish failed.");return body;});})'
+        . '.then(function(body){alert(body.message||"Playlist published.");})'
+        . '.catch(function(e){alert(e&&e.message?e.message:"Publish failed.");});})();';
+
+    return 'javascript:' . rawurlencode($script);
+}
+
+function homePublishPlaylist(string $token, string $host, array $services): int
+{
+    $home = homeByToken($token);
+    if ($home === null) {
+        throw new InvalidArgumentException('This house was not found.');
+    }
+    if (!homeHostOk($host)) {
+        throw new InvalidArgumentException('The receiver address is not valid.');
+    }
+    if (!isset($services['services']) || !is_array($services['services'])) {
+        throw new InvalidArgumentException('The channel list is missing.');
+    }
+    $GLOBALS['receiver_override'] = [
+        'host' => $host,
+        'webif_port' => 80,
+        'stream_port' => (int) $home['stream_port'],
+    ];
+    ob_start();
+    $count = writePlaylist($services, null, 'all');
+    $body = ob_get_clean();
+    if ($body === false || $body === '') {
+        throw new RuntimeException('The playlist could not be written.');
+    }
+    $path = homePlaylistPath($token);
+    $dir = dirname($path);
+    if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+        throw new RuntimeException('The house folder could not be created.');
+    }
+    $tmp = $path . '.tmp';
+    if (file_put_contents($tmp, $body, LOCK_EX) === false) {
+        throw new RuntimeException('The playlist could not be saved.');
+    }
+    if (!rename($tmp, $path)) {
+        @unlink($tmp);
+        throw new RuntimeException('The playlist could not be saved.');
+    }
+    homeMarkBuilt($token, $host);
+
+    return $count;
 }
 
 function epgRytecUrls(string $file): array

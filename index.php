@@ -1,9 +1,11 @@
 <?php
 
-require_once __DIR__ . '/lib.php';
+require_once __DIR__ . '/epg.lib.php';
 
 $formError = null;
+$homeError = null;
 $saved = isset($_GET['saved']);
+$homeSaved = isset($_GET['home']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     try {
@@ -15,6 +17,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     } catch (Throwable $e) {
         $formError = $e->getMessage();
     }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_home'])) {
+    try {
+        homeCreate((string) ($_POST['house_name'] ?? ''), (int) ($_POST['house_stream_port'] ?? 8001));
+        header('Location: index.php?home=1');
+        exit;
+    } catch (InvalidArgumentException $e) {
+        $homeError = $e->getMessage();
+    } catch (Throwable $e) {
+        $homeError = $e->getMessage();
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_home'])) {
+    homeDelete((string) ($_POST['token'] ?? ''));
+    header('Location: index.php');
+    exit;
 }
 
 $settings = receiverSettings();
@@ -34,6 +54,14 @@ $links = [
     'Satellite only' => $base . '/playlist.php?type=tv',
 ];
 $media = mediaUrls();
+$homes = [];
+try {
+    $homes = homeList();
+} catch (Throwable $e) {
+    if ($homeError === null) {
+        $homeError = $e->getMessage();
+    }
+}
 
 ?>
 <!DOCTYPE html>
@@ -87,6 +115,52 @@ $media = mediaUrls();
             <?php endif; ?>
         </p>
     </form>
+
+    <section class="panel stack">
+        <h2>Houses</h2>
+        <p class="note">Each house gets its own playlist. Build it at home: open the receiver web page, then use that house’s bookmark. The stream addresses in the file use the receiver you opened. TiviMate at home loads the playlist and the shared guide from this site.</p>
+        <?php if ($homeError !== null): ?>
+            <p class="error"><?= h($homeError) ?></p>
+        <?php elseif ($homeSaved): ?>
+            <p class="oknote">House added. Drag its bookmark onto the bookmark bar, then open it on the receiver web page.</p>
+        <?php endif; ?>
+        <form class="toolbar" method="post" action="index.php">
+            <input type="hidden" name="create_home" value="1">
+            <label class="field"><span>House name</span>
+                <input name="house_name" maxlength="80" required>
+            </label>
+            <label class="field port"><span>Stream port</span>
+                <input name="house_stream_port" type="number" min="1" max="65535" value="8001" required>
+            </label>
+            <div class="actions">
+                <button class="btn primary" type="submit">Add house</button>
+            </div>
+        </form>
+        <?php foreach ($homes as $house): ?>
+            <?php
+            $token = (string) $house['token'];
+            $playlistUrl = $base . '/u/' . $token . '/channels.m3u8';
+            $bookmark = homeBookmarklet($token);
+            ?>
+            <div class="urlbox">
+                <p class="meta"><?= h((string) $house['name']) ?> · stream port <?= (int) $house['stream_port'] ?><?= $house['host'] !== '' ? ' · ' . h((string) $house['host']) : '' ?><?= $house['built_at'] !== null && $house['built_at'] !== '' ? ' · built ' . h((string) $house['built_at']) : '' ?></p>
+                <p class="meta">Playlist</p>
+                <p class="url"><?= h($playlistUrl) ?></p>
+                <button class="btn" type="button" data-copy="<?= h($playlistUrl) ?>">Copy</button>
+                <p class="meta">Guide</p>
+                <p class="url"><?= h($media['epg']) ?></p>
+                <button class="btn" type="button" data-copy="<?= h($media['epg']) ?>">Copy</button>
+                <p class="meta">Bookmark for the receiver web page</p>
+                <p><a class="btn" href="<?= h($bookmark) ?>">Publish playlist</a></p>
+                <button class="btn" type="button" data-copy="<?= h($bookmark) ?>">Copy bookmark</button>
+                <form method="post" action="index.php">
+                    <input type="hidden" name="delete_home" value="1">
+                    <input type="hidden" name="token" value="<?= h($token) ?>">
+                    <button class="btn" type="submit">Remove house</button>
+                </form>
+            </div>
+        <?php endforeach; ?>
+    </section>
 
     <div class="workspace">
         <section class="panel">
