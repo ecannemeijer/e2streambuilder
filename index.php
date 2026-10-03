@@ -361,7 +361,8 @@ if ($activeHouse === '' && $homes !== []) {
                     <input type="hidden" name="token" value="<?= h($token) ?>">
                     <button class="btn" type="submit">Publish playlist</button>
                 </form>
-                <button class="btn" type="button" data-copy="<?= h($bookmark) ?>">Copy bookmark</button>
+                <button class="btn" type="button" data-copy="<?= h($bookmark) ?>" title="Copies a browser bookmark. Open the receiver web page, then click that bookmark.">Copy bookmark</button>
+                <p class="meta">Copy bookmark is for the receiver web page. Publish playlist reads the receiver from here.</p>
                 <form method="post" action="index.php" onsubmit="return confirm('Remove this house?');">
                     <?= authCsrfField() ?>
                     <input type="hidden" name="delete_home" value="1">
@@ -375,29 +376,29 @@ if ($activeHouse === '' && $homes !== []) {
     <?php if ($account === null): ?>
     <section class="intro">
         <div class="intro-hero">
-            <p class="eyebrow">Enigma2 voor TiviMate</p>
-            <h1>Je zenders, als afspeellijst met gids.</h1>
-            <p class="lead">E2 Stream Builder maakt van een Enigma2-ontvanger een afspeellijst voor TiviMate. Per huis krijg je een adres voor de zenders en een adres voor de programmagids. Het beeld gaat rechtstreeks naar de ontvanger.</p>
+            <p class="eyebrow">Enigma2 for TiviMate</p>
+            <h1>Your channels, as a playlist with a guide.</h1>
+            <p class="lead">E2 Stream Builder turns an Enigma2 receiver into a playlist for TiviMate. Each house gets an address for the channels and an address for the programme guide. Playback goes straight to the receiver.</p>
             <div class="intro-actions">
-                <button class="btn primary" type="button" data-open="register">Account maken</button>
-                <button class="btn" type="button" data-open="login">Inloggen</button>
+                <button class="btn primary" type="button" data-open="register">Create account</button>
+                <button class="btn" type="button" data-open="login">Log in</button>
             </div>
         </div>
         <div class="intro-grid">
             <article>
                 <span class="step">1</span>
                 <h2>Account</h2>
-                <p>Maak een account met je e-mailadres. Daarmee log je in, en daarheen gaan de links.</p>
+                <p>Create an account with your email address. You log in with it, and the links are sent there.</p>
             </article>
             <article>
                 <span class="step">2</span>
-                <h2>Huis</h2>
-                <p>Voeg een huis toe, vul de ontvanger in en publiceer de lijst. Je krijgt het zenderadres en het gidsadres.</p>
+                <h2>House</h2>
+                <p>Add a house, enter the receiver, and publish the list. You get the channel address and the guide address.</p>
             </article>
             <article>
                 <span class="step">3</span>
-                <h2>Kijken</h2>
-                <p>Plak het zenderadres in TiviMate. De gids hoort bij die lijst, zodat de programma’s meekomen.</p>
+                <h2>Watch</h2>
+                <p>Paste the channel address into TiviMate. The guide belongs to that list, so the programmes come with it.</p>
             </article>
         </div>
     </section>
