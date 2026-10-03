@@ -463,6 +463,36 @@ function authCsrfCheck(): void
     }
 }
 
+function authFail(string $dialog, string $message, string $username = ''): void
+{
+    authStart();
+    $_SESSION['auth_flash'] = [
+        'dialog' => $dialog,
+        'message' => $message,
+        'username' => trim($username),
+    ];
+    session_write_close();
+    header('Location: index.php');
+    exit;
+}
+
+/** @return array{dialog: string, message: string, username: string} */
+function authFlashTake(): array
+{
+    authStart();
+    $flash = $_SESSION['auth_flash'] ?? null;
+    unset($_SESSION['auth_flash']);
+    if (!is_array($flash)) {
+        return ['dialog' => '', 'message' => '', 'username' => ''];
+    }
+
+    return [
+        'dialog' => (string) ($flash['dialog'] ?? ''),
+        'message' => (string) ($flash['message'] ?? ''),
+        'username' => (string) ($flash['username'] ?? ''),
+    ];
+}
+
 function authUsernameOk(string $name): bool
 {
     return preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._-]{1,39}$/', $name) === 1;
@@ -545,7 +575,7 @@ function authLogin(string $username, string $password): array
     $row = $stmt->fetch();
     $hash = is_array($row) ? (string) $row['password_hash'] : '';
     if ($hash === '' || !password_verify($password, $hash)) {
-        throw new InvalidArgumentException('The username or password is wrong.');
+        throw new InvalidArgumentException('The username or password is wrong. Create an account first if you do not have one.');
     }
     authRemember((int) $row['id']);
     $user = authUser();

@@ -51,6 +51,8 @@ function appShellStyle(): void
 #help .dialog,#xtream .dialog,#receiver .dialog,#add-house .dialog,#login .dialog,#register .dialog{width:min(640px,100%);max-height:min(80vh,720px);overflow:auto;background:var(--raise,#181e19);color:var(--text,#e7efe6);border:1px solid var(--line,#313a32);border-radius:14px;padding:18px;box-shadow:0 18px 40px rgba(0,0,0,.35)}
 #help .dialog h2,#xtream .dialog h2,#receiver .dialog h2,#add-house .dialog h2,#login .dialog h2,#register .dialog h2{margin:0 0 8px}
 #help .dialog p,#help .dialog li,#xtream .dialog p,#xtream .dialog li,#receiver .dialog p,#add-house .dialog p,#login .dialog p,#register .dialog p{color:var(--muted,#93a196)}
+#login .dialog p.error,#register .dialog p.error,#add-house .dialog p.error,#receiver .dialog p.error{color:#e07a68 !important;font-weight:700}
+#login .dialog .field input,#register .dialog .field input,#add-house .dialog .field input{width:100%;box-sizing:border-box}
 #help .dialog ol{margin:0 0 12px;padding-left:1.2rem}
 @keyframes e2spin{to{transform:rotate(360deg)}}
 html[data-theme="light"]{color-scheme:light;--bg:#f4f1ea !important;--raise:#fffdf8 !important;--raise-2:#efe8dc !important;--line:#d7cec0 !important;--text:#241c14 !important;--muted:#6d645b !important;--accent:#b86a1d !important;--accent-ink:#fff8ef !important;--accent-line:#8d4e12 !important;--good:#2f7d46 !important;--warn:#a15c12 !important;--bad:#b42318 !important;--sat:#3d5a73 !important;--stage:#1c1916 !important;--shadow:0 18px 40px rgba(70,48,20,.12) !important}
@@ -101,6 +103,16 @@ document.addEventListener("DOMContentLoaded",function(){
   bindOverlay("add-house","add-house-open");
   bindOverlay("login","login-open");
   bindOverlay("register","register-open");
+  var toRegister=document.getElementById("login-to-register");
+  if(toRegister)toRegister.addEventListener("click",function(){
+    var login=document.getElementById("login");
+    var register=document.getElementById("register");
+    var from=login?login.querySelector("input[name=username]"):null;
+    var into=register?register.querySelector("input[name=username]"):null;
+    if(from&&into&&from.value)into.value=from.value;
+    if(login)login.classList.remove("is-open");
+    if(register)register.classList.add("is-open");
+  });
   document.addEventListener("keydown",function(event){if(event.key==="Escape"){closeHelp();closeXtream();}});
   if(/[?&]xtream=1(?:&|$)/.test(location.search))openXtream();
   function showLoading(text){

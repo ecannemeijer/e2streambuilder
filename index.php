@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['logout'])) {
         header('Location: index.php');
         exit;
     } catch (InvalidArgumentException $e) {
-        $authError = $e->getMessage();
+        authFail('login', $e->getMessage());
     }
 }
 
@@ -37,11 +37,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
     try {
         authCsrfCheck();
         authLogin((string) ($_POST['username'] ?? ''), (string) ($_POST['password'] ?? ''));
+        session_write_close();
         header('Location: index.php');
         exit;
     } catch (InvalidArgumentException $e) {
-        $authError = $e->getMessage();
-        $authDialog = 'login';
+        authFail('login', $e->getMessage(), (string) ($_POST['username'] ?? ''));
     }
 }
 
@@ -49,13 +49,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register'])) {
     try {
         authCsrfCheck();
         authRegister((string) ($_POST['username'] ?? ''), (string) ($_POST['password'] ?? ''));
+        session_write_close();
         header('Location: index.php');
         exit;
     } catch (InvalidArgumentException $e) {
-        $authError = $e->getMessage();
-        $authDialog = 'register';
+        authFail('register', $e->getMessage(), (string) ($_POST['username'] ?? ''));
     }
 }
+
+$flash = authFlashTake();
+if ($flash['message'] !== '') {
+    $authError = $flash['message'];
+    $authDialog = $flash['dialog'];
+}
+$authUsername = $flash['username'];
 
 $account = authUser();
 
@@ -177,17 +184,18 @@ if ($activeHouse === '' && $homes !== []) {
         <?php if ($authDialog === 'login' && $authError !== null): ?>
             <p class="error"><?= h($authError) ?></p>
         <?php endif; ?>
-        <form class="toolbar" method="post" action="index.php">
+        <form class="stack" method="post" action="index.php">
             <?= authCsrfField() ?>
             <input type="hidden" name="login" value="1">
             <label class="field"><span>Username</span>
-                <input name="username" maxlength="40" autocomplete="username" required>
+                <input name="username" maxlength="40" autocomplete="username" value="<?= h($authDialog === 'login' ? $authUsername : '') ?>" required>
             </label>
             <label class="field"><span>Password</span>
-                <input name="password" type="password" maxlength="200" autocomplete="current-password" required>
+                <input name="password" type="password" maxlength="200" autocomplete="current-password" required<?= $authDialog === 'login' && $authError !== null ? ' autofocus' : '' ?>>
             </label>
             <div class="actions">
                 <button class="btn primary" type="submit">Log in</button>
+                <button class="btn" type="button" id="login-to-register">Create account</button>
             </div>
         </form>
         <button class="btn" type="button" data-close>Close</button>
@@ -200,11 +208,11 @@ if ($activeHouse === '' && $homes !== []) {
         <?php if ($authDialog === 'register' && $authError !== null): ?>
             <p class="error"><?= h($authError) ?></p>
         <?php endif; ?>
-        <form class="toolbar" method="post" action="index.php">
+        <form class="stack" method="post" action="index.php">
             <?= authCsrfField() ?>
             <input type="hidden" name="register" value="1">
             <label class="field"><span>Username</span>
-                <input name="username" maxlength="40" autocomplete="username" required>
+                <input name="username" maxlength="40" autocomplete="username" value="<?= h($authDialog === 'register' ? $authUsername : '') ?>" required>
             </label>
             <label class="field"><span>Password</span>
                 <input name="password" type="password" minlength="8" maxlength="200" autocomplete="new-password" required>
@@ -273,7 +281,9 @@ if ($activeHouse === '' && $homes !== []) {
     </header>
 
     <div class="housebars">
-        <?php if ($account === null): ?>
+        <?php if ($authError !== null): ?>
+            <p class="error"><?= h($authError) ?></p>
+        <?php elseif ($account === null): ?>
             <p class="note">Log in to see your houses. Create an account if you do not have one.</p>
         <?php elseif ($homes === []): ?>
             <p class="note">Add a house. The menu then shows that name next to “You are”.</p>
