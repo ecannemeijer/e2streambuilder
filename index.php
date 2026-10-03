@@ -321,7 +321,7 @@ if ($activeHouse === '' && $homes !== []) {
     <div class="housebars">
         <?php if ($authError !== null): ?>
             <p class="error"><?= h($authError) ?></p>
-        <?php elseif ($homes === []): ?>
+        <?php elseif ($account !== null && $homes === []): ?>
             <p class="note">Add a house. The menu then shows that name next to “You are”.</p>
         <?php endif; ?>
         <?php if ($mailNote !== null): ?>

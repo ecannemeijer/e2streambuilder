@@ -599,9 +599,9 @@ body.scroll .panel.stack { display: block; overflow: visible; margin-top: 14px; 
     min-height: 0;
     overflow: auto;
     display: grid;
-    align-content: center;
+    align-content: start;
     gap: 28px;
-    padding: 8px 6px 20px;
+    padding: 28px 6px 20px;
 }
 
 .intro-hero { max-width: 44rem; }
