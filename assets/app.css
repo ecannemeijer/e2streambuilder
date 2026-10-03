@@ -202,11 +202,9 @@ button { cursor: pointer; }
 .user-house-head .note,
 .user-empty p { margin: 0; color: var(--muted); }
 
-.user-grid {
+.user-stack {
     display: grid;
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
     gap: 16px;
-    align-items: start;
 }
 
 .user-card {
@@ -221,8 +219,6 @@ button { cursor: pointer; }
 .user-card > p { margin: 0 0 12px; color: var(--muted); }
 .user-card .house-links { margin-top: 4px; }
 .user-card .guide-steps { margin: 0; }
-
-.user-remove { margin: 0; justify-self: start; }
 
 .housebar .you { margin: 0; color: var(--accent); font-weight: 650; }
 .housebar .meta { margin: 0; }
@@ -688,7 +684,6 @@ body.scroll .panel.stack { display: block; overflow: visible; margin-top: 14px; 
         max-height: calc(100dvh - 24px);
     }
     .house-link { grid-template-columns: 1fr; }
-    .user-grid,
     .user-card .house-links { grid-template-columns: 1fr; }
 }
 

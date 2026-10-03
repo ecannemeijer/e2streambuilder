@@ -187,7 +187,7 @@ if ($activeHouse === '' && $homes !== []) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=20">
+    <link rel="stylesheet" href="assets/app.css?v=21">
     <?php appShellStyle(); ?>
 </head>
 <body>
@@ -327,6 +327,14 @@ if ($activeHouse === '' && $homes !== []) {
                 </select>
             </label>
             <button class="nav-btn" type="button" id="add-house-open">Add house</button>
+            <?php if (!$isAdmin && $activeHouse !== ''): ?>
+            <form method="post" action="index.php" onsubmit="return confirm('Remove this house?');">
+                <?= authCsrfField() ?>
+                <input type="hidden" name="delete_home" value="1">
+                <input type="hidden" name="token" id="remove-house-token" value="<?= h($activeHouse) ?>">
+                <button class="nav-btn" type="submit">Remove house</button>
+            </form>
+            <?php endif; ?>
             <form method="post" action="index.php">
                 <?= authCsrfField() ?>
                 <input type="hidden" name="logout" value="1">
@@ -551,7 +559,7 @@ if ($activeHouse === '' && $homes !== []) {
                     <h1>Your playlist</h1>
                     <p class="note"><?= $built !== '' ? 'Last published ' . h($built) . '.' : 'Not published yet.' ?></p>
                 </header>
-                <div class="user-grid">
+                <div class="user-stack">
                     <section class="user-card">
                         <h2>Player addresses</h2>
                         <p>Paste both addresses into your IPTV player. The player has to be on the same network as the receiver. The guide refreshes each night. The channel list changes only when you publish again.</p>
@@ -599,12 +607,6 @@ if ($activeHouse === '' && $homes !== []) {
                         </div>
                     </section>
                 </div>
-                <form class="user-remove" method="post" action="index.php" onsubmit="return confirm('Remove this house?');">
-                    <?= authCsrfField() ?>
-                    <input type="hidden" name="delete_home" value="1">
-                    <input type="hidden" name="token" value="<?= h($token) ?>">
-                    <button class="btn" type="submit">Remove house</button>
-                </form>
             </article>
         <?php endforeach; ?>
     </div>
@@ -633,6 +635,8 @@ if ($activeHouse === '' && $homes !== []) {
             });
         }
         if (token) pick.value = token;
+        var removeToken = document.getElementById('remove-house-token');
+        if (removeToken && token) removeToken.value = token;
         try { if (token) localStorage.setItem(key, token); } catch (e) {}
     }
     show(params.get('house') || stored || pick.value);
