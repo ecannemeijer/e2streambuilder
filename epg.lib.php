@@ -2810,6 +2810,147 @@ function epgUpdateIsDue(): bool
     return time() - $finished >= $interval;
 }
 
+/**
+ * Filter the shared guide into each published house.
+ * Houses with the same channel set share one filtered file.
+ *
+ * @return array{houses: int, groups: int}
+ */
+function epgRefreshHouseGuides(): array
+{
+    $shared = epgXmlPath();
+    if (!is_file($shared)) {
+        epgLog('House guides skipped: the shared guide is missing.');
+
+        return ['houses' => 0, 'groups' => 0];
+    }
+
+    /** @var array<string, array{ids: array<string, true>, tokens: list<string>, names: list<string>}> $groups */
+    $groups = [];
+    foreach (epgDb()->query('SELECT token, name FROM homes') as $row) {
+        $token = (string) $row['token'];
+        if (!homeTokenOk($token)) {
+            continue;
+        }
+        $playlist = homePlaylistPath($token);
+        if (!is_file($playlist)) {
+            continue;
+        }
+        $body = file_get_contents($playlist);
+        if (!is_string($body) || $body === '') {
+            continue;
+        }
+        $ids = playlistIdsInBody($body);
+        sort($ids, SORT_STRING);
+        $key = hash('sha256', implode("\n", $ids));
+        if (!isset($groups[$key])) {
+            $groups[$key] = [
+                'ids' => array_fill_keys($ids, true),
+                'tokens' => [],
+                'names' => [],
+            ];
+        }
+        $groups[$key]['tokens'][] = $token;
+        $groups[$key]['names'][] = (string) $row['name'];
+    }
+    if ($groups === []) {
+        return ['houses' => 0, 'groups' => 0];
+    }
+
+    /** @var array<string, list<string>> $byChannel */
+    $byChannel = [];
+    /** @var array<string, resource> $handles */
+    $handles = [];
+    /** @var array<string, string> $temps */
+    $temps = [];
+    $houses = 0;
+    try {
+        foreach ($groups as $key => $group) {
+            $tmp = epgTemp('.house.xml');
+            $handle = fopen($tmp, 'wb');
+            if ($handle === false) {
+                throw new RuntimeException('A house guide could not be created.');
+            }
+            fwrite($handle, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+            fwrite($handle, "<tv generator-info-name=\"E2 naar M3U8\">\n");
+            $handles[$key] = $handle;
+            $temps[$key] = $tmp;
+            foreach (array_keys($group['ids']) as $id) {
+                $byChannel[$id][] = $key;
+            }
+        }
+
+        epgWalkElements($shared, static function (string $name, array $attributes, string $outer) use ($byChannel, $handles): void {
+            if ($outer === '' || ($name !== 'channel' && $name !== 'programme')) {
+                return;
+            }
+            $id = $name === 'channel'
+                ? (string) ($attributes['id'] ?? '')
+                : (string) ($attributes['channel'] ?? '');
+            if ($id === '' || !isset($byChannel[$id])) {
+                return;
+            }
+            $line = $outer . "\n";
+            foreach ($byChannel[$id] as $key) {
+                fwrite($handles[$key], $line);
+            }
+        });
+
+        foreach ($groups as $key => $group) {
+            fwrite($handles[$key], "</tv>\n");
+            fclose($handles[$key]);
+            unset($handles[$key]);
+            $packed = $temps[$key] . '.gz';
+            try {
+                epgGzipFile($temps[$key], $packed);
+            } catch (Throwable $e) {
+                @unlink($temps[$key]);
+                @unlink($packed);
+                @unlink($packed . '.tmp');
+                unset($temps[$key]);
+                epgLog('House guide failed for ' . implode(', ', $group['names']) . ': ' . $e->getMessage());
+                continue;
+            }
+            @unlink($temps[$key]);
+            unset($temps[$key]);
+            foreach ($group['tokens'] as $index => $token) {
+                $name = $group['names'][$index] ?? $token;
+                $dest = homeEpgGzPath($token);
+                $dir = dirname($dest);
+                $copyTmp = $dest . '.tmp';
+                try {
+                    if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+                        throw new RuntimeException('The house folder could not be created.');
+                    }
+                    if (!copy($packed, $copyTmp)) {
+                        throw new RuntimeException('The house guide could not be copied.');
+                    }
+                    epgAtomicReplace($copyTmp, $dest);
+                    $houses++;
+                } catch (Throwable $e) {
+                    @unlink($copyTmp);
+                    epgLog('House guide failed for ' . $name . ': ' . $e->getMessage());
+                }
+            }
+            @unlink($packed);
+        }
+    } finally {
+        foreach ($handles as $handle) {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+        }
+        foreach ($temps as $tmp) {
+            @unlink($tmp);
+            @unlink($tmp . '.gz');
+        }
+    }
+
+    epgLog('House guides refreshed: ' . $houses . ' from ' . count($groups) . ' channel lists.');
+
+    return ['houses' => $houses, 'groups' => count($groups)];
+}
+
 function epgRunUpdate(string $trigger, bool $force): array
 {
     if (!$force && !epgUpdateIsDue()) {
@@ -2858,6 +2999,11 @@ function epgRunUpdate(string $trigger, bool $force): array
             epgLog('Generating epg.xml failed: ' . $e->getMessage());
             epgHistoryFinish($historyId, 'error', implode("\n", $sourceErrors), $stats);
             throw $e;
+        }
+        try {
+            epgRefreshHouseGuides();
+        } catch (Throwable $e) {
+            epgLog('House guides failed: ' . $e->getMessage());
         }
         $published = (($stats['channels'] ?? 0) > 0) || (($stats['programmes'] ?? 0) > 0);
         $message = $sourceErrors === [] ? 'Updated.' : implode("\n", $sourceErrors);
