@@ -315,6 +315,7 @@ if ($activeHouse === '' && $homes !== []) {
             $slug = (string) $house['slug'];
             $playlistUrl = homeChannelsUrl($slug);
             $guideUrl = homeGuideUrl($slug);
+            $bookmark = homeBookmarklet($token);
             $receiverHost = (string) $house['host'] !== '' ? (string) $house['host'] : (string) $settings['host'];
             ?>
             <div class="housebar" data-house="<?= h($token) ?>"<?= $token === $activeHouse ? '' : ' hidden' ?>>
@@ -353,6 +354,7 @@ if ($activeHouse === '' && $homes !== []) {
                         <input type="hidden" name="token" value="<?= h($token) ?>">
                         <button class="btn" type="submit">Publish playlist</button>
                     </form>
+                    <button class="btn" type="button" data-copy="<?= h($bookmark) ?>">Copy bookmark</button>
                     <form method="post" action="index.php" onsubmit="return confirm('Remove this house?');">
                         <?= authCsrfField() ?>
                         <input type="hidden" name="delete_home" value="1">
@@ -360,6 +362,7 @@ if ($activeHouse === '' && $homes !== []) {
                         <button class="btn" type="submit">Remove</button>
                     </form>
                 </div>
+                <p class="meta">Copy bookmark copies a browser bookmark. Create a bookmark, paste the copied text as its address, open the receiver web page, then click that bookmark. It reads the channels there and sends them to this site.</p>
             </div>
         <?php endforeach; ?>
     </div>

@@ -238,6 +238,7 @@ function appChrome(): void
         echo '<li>Create an account with your email address and log in.</li>';
         echo '<li>Add a house. The address uses the house name, for example <code>/u/kilder/channels.m3u8</code>.</li>';
         echo '<li>Enter the receiver address next to the house, press <strong>Save</strong>, then <strong>Publish playlist</strong>. OpenWebIF is used to read all the channels. That writes the personal playlist and the guide on this server, and sends both addresses to your email.</li>';
+        echo '<li>When the receiver is on another network, press <strong>Copy bookmark</strong>. Create a browser bookmark and paste the copied text as its address. Open the receiver web page, then click that bookmark. The browser reads OpenWebIF there and sends the channels to this site.</li>';
         echo '<li>In your IPTV player, add the channels address as a playlist. The categories follow the bouquets on the receiver. The guide address is shown next to the playlist.</li>';
         echo '<li><strong>Download e2.m3u8</strong> builds the selected bouquets and saves that copy on your computer.</li>';
         echo '</ol>';
