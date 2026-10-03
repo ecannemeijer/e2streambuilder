@@ -503,6 +503,68 @@ body.scroll .panel.stack { display: block; overflow: visible; margin-top: 14px; 
     .nav .theme { margin-left: 0; }
 }
 
+@media (max-width: 800px) {
+    html, body {
+        height: auto;
+        overflow: auto;
+    }
+    .app, .app.homes {
+        height: auto;
+        overflow: visible;
+        display: block;
+    }
+    .workspace {
+        display: flex;
+        flex-direction: column;
+        overflow: visible;
+        height: auto;
+    }
+    .panel {
+        height: auto;
+        min-height: 0;
+        max-height: none;
+        overflow: visible;
+        margin-bottom: 14px;
+    }
+    .panel.player { overflow: visible; }
+    .list {
+        flex: none;
+        max-height: 50vh;
+        min-height: 180px;
+    }
+    .url.slim {
+        flex: 1 1 100%;
+        max-width: none;
+        min-width: 0;
+        overflow: visible;
+        text-overflow: unset;
+        white-space: normal;
+        word-break: break-all;
+        font-size: 1rem;
+    }
+    .field input,
+    .field input[name="host"],
+    .field.port input,
+    .house-switch,
+    .house-switch select {
+        width: 100%;
+        max-width: none;
+    }
+    input, select, textarea { font-size: 16px; }
+    .btn, .nav a, .menubar .nav-btn, .nav button.nav-btn {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .status { white-space: normal; }
+    .menubar .nav { flex: 1 1 100%; }
+    .dialog {
+        width: 100%;
+        max-height: calc(100dvh - 24px);
+    }
+}
+
 html[data-theme="light"] {
     color-scheme: light;
     --bg: #f4f1ea;

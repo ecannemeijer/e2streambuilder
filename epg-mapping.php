@@ -76,7 +76,7 @@ function mappingHref(string $status, string $query, int $page): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>EPG mapping · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=7">
+    <link rel="stylesheet" href="assets/app.css?v=11">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">

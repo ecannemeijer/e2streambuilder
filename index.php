@@ -140,7 +140,7 @@ if ($activeHouse === '' && $homes !== []) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=10">
+    <link rel="stylesheet" href="assets/app.css?v=11">
     <?php appShellStyle(); ?>
 </head>
 <body>
@@ -291,7 +291,7 @@ if ($activeHouse === '' && $homes !== []) {
         <?php foreach ($homes as $house): ?>
             <?php
             $token = (string) $house['token'];
-            $playlistUrl = $base . '/u/' . $token . '/channels.m3u8';
+            $playlistUrl = $base . '/u/' . rawurlencode((string) $house['slug']) . '/channels.m3u8';
             $bookmark = homeBookmarklet($token);
             ?>
             <div class="housebar" data-house="<?= h($token) ?>"<?= $token === $activeHouse ? '' : ' hidden' ?>>

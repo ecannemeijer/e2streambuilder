@@ -305,6 +305,46 @@ function epgMigrate(PDO $db): void
         $db->exec('CREATE INDEX IF NOT EXISTS homes_user ON homes(user_id)');
         $db->exec('INSERT INTO epg_schema (version) VALUES (5)');
     }
+    if ($version < 6) {
+        $hasSlug = false;
+        foreach ($db->query('PRAGMA table_info(homes)') as $info) {
+            if ((string) $info['name'] === 'slug') {
+                $hasSlug = true;
+                break;
+            }
+        }
+        if (!$hasSlug) {
+            $db->exec('ALTER TABLE homes ADD COLUMN slug TEXT');
+        }
+        $used = [];
+        $pending = [];
+        foreach ($db->query('SELECT token, name, slug FROM homes') as $row) {
+            $current = (string) ($row['slug'] ?? '');
+            if (homeSlugOk($current)) {
+                $used[$current] = true;
+                continue;
+            }
+            $pending[] = $row;
+        }
+        $update = $db->prepare('UPDATE homes SET slug = ? WHERE token = ?');
+        foreach ($pending as $row) {
+            $base = homeSlugFromName((string) $row['name']);
+            if ($base === '') {
+                $base = 'house';
+            }
+            $slug = $base;
+            $n = 2;
+            while (isset($used[$slug])) {
+                $suffix = '-' . $n;
+                $slug = rtrim(substr($base, 0, 40 - strlen($suffix)), '-') . $suffix;
+                $n++;
+            }
+            $update->execute([$slug, $row['token']]);
+            $used[$slug] = true;
+        }
+        $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS homes_slug ON homes(slug)');
+        $db->exec('INSERT INTO epg_schema (version) VALUES (6)');
+    }
     epgSeedSources();
 }
 
@@ -326,6 +366,23 @@ function epgStateSet(string $key, string $value): void
 function homeTokenOk(string $token): bool
 {
     return preg_match('/^[a-f0-9]{32}$/', $token) === 1;
+}
+
+function homeSlugOk(string $slug): bool
+{
+    return preg_match('/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/', $slug) === 1;
+}
+
+function homeSlugFromName(string $name): string
+{
+    $slug = strtolower($name);
+    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
+    $slug = trim($slug, '-');
+    if (strlen($slug) > 40) {
+        $slug = rtrim(substr($slug, 0, 40), '-');
+    }
+
+    return $slug;
 }
 
 function homeHostOk(string $host): bool
@@ -357,10 +414,26 @@ function homeCreate(string $name, int $streamPort, int $userId): array
     if ($streamPort < 1 || $streamPort > 65535) {
         throw new InvalidArgumentException('The stream port must be between 1 and 65535.');
     }
+    $slug = homeSlugFromName($name);
+    if (!homeSlugOk($slug)) {
+        throw new InvalidArgumentException('Use a house name with a letter or number. The playlist address uses that name.');
+    }
+    $taken = epgDb()->prepare('SELECT 1 FROM homes WHERE slug = ?');
+    $taken->execute([$slug]);
+    if ($taken->fetchColumn()) {
+        throw new InvalidArgumentException('That house name is already used. Choose another.');
+    }
     $token = bin2hex(random_bytes(16));
     $now = epgNow();
-    epgDb()->prepare('INSERT INTO homes (token, name, stream_port, host, created_at, user_id) VALUES (?, ?, ?, \'\', ?, ?)')
-        ->execute([$token, $name, $streamPort, $now, $userId]);
+    try {
+        epgDb()->prepare('INSERT INTO homes (token, name, slug, stream_port, host, created_at, user_id) VALUES (?, ?, ?, ?, \'\', ?, ?)')
+            ->execute([$token, $name, $slug, $streamPort, $now, $userId]);
+    } catch (PDOException $e) {
+        if (str_contains($e->getMessage(), 'UNIQUE')) {
+            throw new InvalidArgumentException('That house name is already used. Choose another.');
+        }
+        throw $e;
+    }
     $home = homeByToken($token);
     if ($home === null) {
         throw new RuntimeException('The house could not be saved.');
@@ -390,8 +463,21 @@ function homeByToken(string $token): ?array
     if (!homeTokenOk($token)) {
         return null;
     }
-    $stmt = epgDb()->prepare('SELECT token, name, stream_port, host, created_at, built_at FROM homes WHERE token = ?');
+    $stmt = epgDb()->prepare('SELECT token, name, slug, stream_port, host, created_at, built_at FROM homes WHERE token = ?');
     $stmt->execute([$token]);
+    $row = $stmt->fetch();
+
+    return is_array($row) ? $row : null;
+}
+
+function homeBySlug(string $slug): ?array
+{
+    $slug = strtolower($slug);
+    if (!homeSlugOk($slug)) {
+        return null;
+    }
+    $stmt = epgDb()->prepare('SELECT token, name, slug, stream_port, host, created_at, built_at FROM homes WHERE slug = ?');
+    $stmt->execute([$slug]);
     $row = $stmt->fetch();
 
     return is_array($row) ? $row : null;
@@ -403,7 +489,7 @@ function homeList(int $userId): array
     if ($userId < 1) {
         return [];
     }
-    $stmt = epgDb()->prepare('SELECT token, name, stream_port, host, created_at, built_at FROM homes WHERE user_id = ? ORDER BY created_at ASC, name ASC');
+    $stmt = epgDb()->prepare('SELECT token, name, slug, stream_port, host, created_at, built_at FROM homes WHERE user_id = ? ORDER BY created_at ASC, name ASC');
     $stmt->execute([$userId]);
     $rows = [];
     foreach ($stmt as $row) {
