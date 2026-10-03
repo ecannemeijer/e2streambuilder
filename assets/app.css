@@ -249,6 +249,10 @@ h1 {
     gap: 14px;
 }
 
+.workspace.two {
+    grid-template-columns: 300px minmax(280px, 1fr);
+}
+
 .panel {
     min-height: 0;
     overflow: hidden;

@@ -9,22 +9,28 @@ function h(string $value): string
 
 function appNav(string $active): void
 {
+    $admin = function_exists('authIsAdmin') && authIsAdmin();
     $items = [
         'playlist' => ['Playlist', 'index.php', false],
-        'epg' => ['EPG', 'epg.php', true],
-        'mapping' => ['EPG mapping', 'epg-mapping.php', true],
     ];
+    if ($admin) {
+        $items['epg'] = ['EPG', 'epg.php', true];
+        $items['mapping'] = ['EPG mapping', 'epg-mapping.php', true];
+        $items['users'] = ['Users', 'users.php', false];
+    }
     echo '<nav class="nav">';
     foreach ($items as $key => $item) {
         $class = $key === $active ? ' class="active' . ($item[2] ? ' slow' : '') . '"' : ($item[2] ? ' class="slow"' : '');
         echo '<a' . $class . ' href="' . h($item[1]) . '">' . h($item[0]) . '</a>';
     }
-    echo '<button class="nav-btn" type="button" id="xtream-open">Xtream</button>';
-    $eitClass = $active === 'eit' ? ' class="active"' : '';
-    echo '<a' . $eitClass . ' href="eit.php">EIT</a>';
-    echo '<form method="post" action="create-all.php">';
-    echo '<button class="nav-btn" type="submit" name="create_all" value="1">Create All</button>';
-    echo '</form>';
+    if ($admin) {
+        echo '<button class="nav-btn" type="button" id="xtream-open">Xtream</button>';
+        $eitClass = $active === 'eit' ? ' class="active"' : '';
+        echo '<a' . $eitClass . ' href="eit.php">EIT</a>';
+        echo '<form method="post" action="create-all.php">';
+        echo '<button class="nav-btn" type="submit" name="create_all" value="1">Create All</button>';
+        echo '</form>';
+    }
     echo '<label class="theme"><span>Theme</span><select id="theme">';
     foreach (['dark' => 'Dark', 'light' => 'Light', 'ocean' => 'Ocean', 'amber' => 'Amber'] as $value => $label) {
         echo '<option value="' . h($value) . '">' . h($label) . '</option>';
@@ -211,22 +217,35 @@ function appChrome(): void
     echo '<div id="help">';
     echo '<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="help-title">';
     echo '<h2 id="help-title">How this works</h2>';
-    echo '<p>This site turns your Enigma2 receiver into a playlist for TiviMate, and adds a programme guide.</p>';
-    echo '<ol>';
-    echo '<li>Set the receiver IP on the Playlist page and save.</li>';
-    echo '<li>Copy the M3U URL (<code>channels.m3u8</code>) into TiviMate as a playlist. Its first line points at the guide, so updating the playlist also loads the EPG.</li>';
-    echo '<li>Copy the EPG URL into TiviMate as an XMLTV source. Use the <code>.gz</code> address.</li>';
-    echo '<li>TiviMate matches the guide with <code>tvg-id</code>. That id is the Rytec channel id, for example <code>NPO1.nl</code>. Playback goes straight to the receiver.</li>';
-    echo '</ol>';
-    echo '<p><strong>Download this source</strong> fetches only that country file. <strong>Download all</strong> fetches every enabled source, matches your channels, and rebuilds the guide. The spinner shows the current step.</p>';
-    echo '<p>Logos come from the tv-logos collection in <code>logos/</code>. An exact filename wins, such as <code>npo1-nl.png</code> for <code>NPO1.nl</code>. Otherwise the logo that shares the most words with the channel name is used. Short pieces such as <code>Jr</code> are ignored, so Veronica / Disney Jr. uses <code>veronica-disney-xd-nl.png</code>. A channel with no matching file stays without a logo. The same address is the guide icon, the playlist <code>tvg-logo</code>, and the Xtream stream icon.</p>';
-    echo '<p>On EPG mapping you can correct a wrong link. A manual link is kept and always wins over automatic matching.</p>';
-    echo '<p>The guide refreshes once per interval when the playlist or EPG is requested. On Linux, <code>xtream-update.php</code> does the nightly download and Xtream rebuild. The public address is remembered from the last time the site was opened.</p>';
-    echo '<p><strong>Xtream Codes:</strong> press <strong>Xtream</strong> next to EPG mapping. Build the list there, then in TiviMate add a playlist, choose Xtream Codes, and paste the server URL, username and password. Channel order follows the bouquet list on the receiver. TiviMate asks this server for the stream, and the server redirects to the receiver.</p>';
-    echo '<p>More detail is in <code>README.md</code>.</p>';
+    $admin = function_exists('authIsAdmin') && authIsAdmin();
+    if ($admin) {
+        echo '<p>This site turns your Enigma2 receiver into a playlist for TiviMate, and adds a programme guide.</p>';
+        echo '<ol>';
+        echo '<li>Set the receiver IP on the Playlist page and save.</li>';
+        echo '<li>Copy the M3U URL (<code>channels.m3u8</code>) into TiviMate as a playlist. Its first line points at the guide, so updating the playlist also loads the EPG.</li>';
+        echo '<li>Copy the EPG URL into TiviMate as an XMLTV source. Use the <code>.gz</code> address.</li>';
+        echo '<li>TiviMate matches the guide with <code>tvg-id</code>. That id is the Rytec channel id, for example <code>NPO1.nl</code>. Playback goes straight to the receiver.</li>';
+        echo '</ol>';
+        echo '<p><strong>Download this source</strong> fetches only that country file. <strong>Download all</strong> fetches every enabled source, matches your channels, and rebuilds the guide. The spinner shows the current step.</p>';
+        echo '<p>Logos come from the tv-logos collection in <code>logos/</code>. An exact filename wins, such as <code>npo1-nl.png</code> for <code>NPO1.nl</code>. Otherwise the logo that shares the most words with the channel name is used. Short pieces such as <code>Jr</code> are ignored, so Veronica / Disney Jr. uses <code>veronica-disney-xd-nl.png</code>. A channel with no matching file stays without a logo. The same address is the guide icon, the playlist <code>tvg-logo</code>, and the Xtream stream icon.</p>';
+        echo '<p>On EPG mapping you can correct a wrong link. A manual link is kept and always wins over automatic matching.</p>';
+        echo '<p>The guide refreshes once per interval when the playlist or EPG is requested. On Linux, <code>xtream-update.php</code> does the nightly download and Xtream rebuild. The public address is remembered from the last time the site was opened.</p>';
+        echo '<p><strong>Xtream Codes:</strong> press <strong>Xtream</strong> next to EPG mapping. Build the list there, then in TiviMate add a playlist, choose Xtream Codes, and paste the server URL, username and password. Channel order follows the bouquet list on the receiver. TiviMate asks this server for the stream, and the server redirects to the receiver.</p>';
+        echo '<p>More detail is in <code>README.md</code>.</p>';
+    } else {
+        echo '<p>Each house has its own playlist. Other accounts do not see your houses.</p>';
+        echo '<ol>';
+        echo '<li>Log in and add a house. The address uses the house name, for example <code>/u/kilder/channels.m3u8</code>.</li>';
+        echo '<li>Open <strong>Receiver</strong>, save the receiver address, then press <strong>Publish playlist</strong>. That stores the list for the house.</li>';
+        echo '<li>In TiviMate, add that house address as a playlist.</li>';
+        echo '<li><strong>Download e2.m3u8</strong> builds the selected bouquets and saves the file on your computer. It is not stored on this server.</li>';
+        echo '</ol>';
+    }
     echo '<button class="btn primary" type="button" data-close-help>Close</button>';
     echo '</div></div>';
-    appXtreamModal();
+    if ($admin) {
+        appXtreamModal();
+    }
 }
 
 function appXtreamModal(): void

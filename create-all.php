@@ -2,6 +2,8 @@
 
 require_once __DIR__ . '/epg.lib.php';
 
+authRequireAdmin();
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_POST['create_all'])) {
     header('Location: index.php');
     exit;

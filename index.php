@@ -165,7 +165,7 @@ if ($activeHouse === '' && $homes !== []) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=11">
+    <link rel="stylesheet" href="assets/app.css?v=12">
     <?php appShellStyle(); ?>
 </head>
 <body>
@@ -347,7 +347,7 @@ if ($activeHouse === '' && $homes !== []) {
         <?php endforeach; ?>
     </div>
 
-    <div class="workspace">
+    <div class="workspace<?= authIsAdmin($account) ? '' : ' two' ?>">
         <section class="panel">
             <h2>Bouquets</h2>
             <?php if ($error !== null): ?>
@@ -398,6 +398,7 @@ if ($activeHouse === '' && $homes !== []) {
             </div>
         </section>
 
+        <?php if (authIsAdmin($account)): ?>
         <section class="panel player">
             <h2>Playback</h2>
             <div class="stage">
@@ -423,6 +424,7 @@ if ($activeHouse === '' && $homes !== []) {
                 <?php endforeach; ?>
             </ul>
         </section>
+        <?php endif; ?>
     </div>
 </div>
 <script>
@@ -454,7 +456,7 @@ if ($activeHouse === '' && $homes !== []) {
     pick.addEventListener('change', function () { show(pick.value); });
 })();
 </script>
-<script src="assets/app.js?v=4"></script>
+<script src="assets/app.js?v=5"></script>
 <script src="assets/epg.js?v=3"></script>
 </body>
 </html>

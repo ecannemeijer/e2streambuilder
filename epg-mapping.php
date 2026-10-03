@@ -2,6 +2,8 @@
 
 require_once __DIR__ . '/epg.lib.php';
 
+authRequireAdmin();
+
 if (isset($_GET['suggest'])) {
     header('Content-Type: application/json; charset=utf-8');
     $query = is_string($_GET['suggest']) ? $_GET['suggest'] : '';

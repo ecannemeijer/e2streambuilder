@@ -2,6 +2,8 @@
 
 require_once __DIR__ . '/xtream.lib.php';
 
+authRequireAdmin();
+
 $return = basename((string) ($_POST['return'] ?? 'index.php'));
 if (!in_array($return, ['index.php', 'epg.php', 'epg-mapping.php'], true)) {
     $return = 'index.php';

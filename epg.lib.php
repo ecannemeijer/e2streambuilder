@@ -345,6 +345,20 @@ function epgMigrate(PDO $db): void
         $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS homes_slug ON homes(slug)');
         $db->exec('INSERT INTO epg_schema (version) VALUES (6)');
     }
+    if ($version < 7) {
+        $hasRole = false;
+        foreach ($db->query('PRAGMA table_info(users)') as $info) {
+            if ((string) $info['name'] === 'role') {
+                $hasRole = true;
+                break;
+            }
+        }
+        if (!$hasRole) {
+            $db->exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'");
+        }
+        $db->exec("UPDATE users SET role = 'admin' WHERE username = 'diesel431' COLLATE NOCASE");
+        $db->exec('INSERT INTO epg_schema (version) VALUES (7)');
+    }
     epgSeedSources();
 }
 
@@ -584,7 +598,7 @@ function authUsernameOk(string $name): bool
     return preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._-]{1,39}$/', $name) === 1;
 }
 
-/** @return array{id: int, username: string}|null */
+/** @return array{id: int, username: string, role: string}|null */
 function authUser(): ?array
 {
     authStart();
@@ -592,7 +606,7 @@ function authUser(): ?array
     if ($id < 1) {
         return null;
     }
-    $stmt = epgDb()->prepare('SELECT id, username FROM users WHERE id = ?');
+    $stmt = epgDb()->prepare('SELECT id, username, role FROM users WHERE id = ?');
     $stmt->execute([$id]);
     $row = $stmt->fetch();
     if (!is_array($row)) {
@@ -601,7 +615,85 @@ function authUser(): ?array
         return null;
     }
 
-    return ['id' => (int) $row['id'], 'username' => (string) $row['username']];
+    return [
+        'id' => (int) $row['id'],
+        'username' => (string) $row['username'],
+        'role' => (string) $row['role'] === 'admin' ? 'admin' : 'user',
+    ];
+}
+
+function authIsAdmin(?array $user = null): bool
+{
+    if ($user === null) {
+        $user = authUser();
+    }
+
+    return is_array($user) && ($user['role'] ?? '') === 'admin';
+}
+
+function authRequireAdmin(): void
+{
+    if (!authIsAdmin()) {
+        header('Location: index.php');
+        exit;
+    }
+}
+
+/** @return list<array{id: int, username: string, role: string, created_at: string}> */
+function authUserList(): array
+{
+    $rows = [];
+    foreach (epgDb()->query('SELECT id, username, role, created_at FROM users ORDER BY username COLLATE NOCASE ASC') as $row) {
+        $rows[] = [
+            'id' => (int) $row['id'],
+            'username' => (string) $row['username'],
+            'role' => (string) $row['role'] === 'admin' ? 'admin' : 'user',
+            'created_at' => (string) $row['created_at'],
+        ];
+    }
+
+    return $rows;
+}
+
+function authUpdateUser(int $id, string $username, string $password, string $role): void
+{
+    if ($id < 1) {
+        throw new InvalidArgumentException('This account was not found.');
+    }
+    $username = trim($username);
+    if (!authUsernameOk($username)) {
+        throw new InvalidArgumentException('Use a username of 2 to 40 letters, numbers, spaces, dots, hyphens or underscores.');
+    }
+    if ($role !== 'admin' && $role !== 'user') {
+        throw new InvalidArgumentException('Choose user or admin.');
+    }
+    if ($password !== '' && (strlen($password) < 8 || strlen($password) > 200)) {
+        throw new InvalidArgumentException('Use a password of at least 8 characters.');
+    }
+    $db = epgDb();
+    $stmt = $db->prepare('SELECT id, role FROM users WHERE id = ?');
+    $stmt->execute([$id]);
+    $current = $stmt->fetch();
+    if (!is_array($current)) {
+        throw new InvalidArgumentException('This account was not found.');
+    }
+    if ($role !== 'admin' && (string) $current['role'] === 'admin') {
+        $admins = (int) $db->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")->fetchColumn();
+        if ($admins < 2) {
+            throw new InvalidArgumentException('Keep at least one admin.');
+        }
+    }
+    $taken = $db->prepare('SELECT id FROM users WHERE username = ? COLLATE NOCASE AND id <> ?');
+    $taken->execute([$username, $id]);
+    if ($taken->fetch()) {
+        throw new InvalidArgumentException('That username is already in use.');
+    }
+    if ($password === '') {
+        $db->prepare('UPDATE users SET username = ?, role = ? WHERE id = ?')->execute([$username, $role, $id]);
+    } else {
+        $db->prepare('UPDATE users SET username = ?, role = ?, password_hash = ? WHERE id = ?')
+            ->execute([$username, $role, password_hash($password, PASSWORD_DEFAULT), $id]);
+    }
 }
 
 function authRemember(int $userId): void
@@ -625,8 +717,8 @@ function authRegister(string $username, string $password): array
     $db->beginTransaction();
     try {
         $count = (int) $db->query('SELECT COUNT(*) FROM users')->fetchColumn();
-        $db->prepare('INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)')
-            ->execute([$username, password_hash($password, PASSWORD_DEFAULT), epgNow()]);
+        $db->prepare('INSERT INTO users (username, password_hash, created_at, role) VALUES (?, ?, ?, ?)')
+            ->execute([$username, password_hash($password, PASSWORD_DEFAULT), epgNow(), 'user']);
         $id = (int) $db->lastInsertId();
         if ($id < 1) {
             throw new RuntimeException('The account could not be saved.');

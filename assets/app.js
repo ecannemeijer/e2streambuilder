@@ -163,6 +163,13 @@ function loadScript(src) {
 }
 
 async function play(channel) {
+    if (!video || !nowName) {
+        activeUrl = channel.url;
+        document.querySelectorAll('.ch').forEach((row) => {
+            row.classList.toggle('active', row.dataset.url === channel.url && row.dataset.name === channel.name);
+        });
+        return;
+    }
     stopPlayback();
     activeUrl = channel.url;
     nowName.textContent = channel.name;

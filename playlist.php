@@ -63,7 +63,7 @@ $body = ob_get_clean();
 if ($body === false) {
     $body = '';
 }
-if (isset($_REQUEST['download']) || requestWantsPublishedPlaylist()) {
+if (!isset($_REQUEST['download']) && requestWantsPublishedPlaylist()) {
     savePublishedPlaylist($body);
 }
 header('Content-Length: ' . (string) strlen($body));

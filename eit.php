@@ -2,6 +2,8 @@
 
 require_once __DIR__ . '/epg.lib.php';
 
+authRequireAdmin();
+
 $notice = null;
 $error = null;
 $progress = $_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['progress'] ?? '') === '1';
