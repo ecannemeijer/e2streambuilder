@@ -71,12 +71,12 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=7">
+    <link rel="stylesheet" href="assets/app.css?v=8">
     <?php appShellStyle(); ?>
 </head>
 <body>
 <?php appChrome(); ?>
-<div class="app">
+<div class="app homes">
     <header class="top">
         <div class="brand">
             <div class="mark" aria-hidden="true"></div>

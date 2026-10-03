@@ -47,6 +47,15 @@ button { cursor: pointer; }
     overflow: hidden;
 }
 
+.app.homes {
+    grid-template-rows: auto auto auto auto minmax(0, 1fr);
+}
+
+.app.homes > .panel.stack {
+    overflow: auto;
+    max-height: 32vh;
+}
+
 .top {
     display: flex;
     justify-content: space-between;
