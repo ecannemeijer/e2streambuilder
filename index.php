@@ -5,7 +5,6 @@ require_once __DIR__ . '/epg.lib.php';
 $formError = null;
 $homeError = null;
 $saved = isset($_GET['saved']);
-$homeSaved = isset($_GET['home']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     try {
@@ -21,8 +20,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_home'])) {
     try {
-        homeCreate((string) ($_POST['house_name'] ?? ''), (int) ($_POST['house_stream_port'] ?? 8001));
-        header('Location: index.php?home=1');
+        $created = homeCreate((string) ($_POST['house_name'] ?? ''), (int) ($_POST['house_stream_port'] ?? 8001));
+        header('Location: index.php?house=' . rawurlencode((string) $created['token']));
         exit;
     } catch (InvalidArgumentException $e) {
         $homeError = $e->getMessage();
@@ -62,6 +61,17 @@ try {
         $homeError = $e->getMessage();
     }
 }
+$requestedHouse = (string) ($_GET['house'] ?? '');
+$activeHouse = '';
+foreach ($homes as $house) {
+    if ((string) $house['token'] === $requestedHouse) {
+        $activeHouse = $requestedHouse;
+        break;
+    }
+}
+if ($activeHouse === '' && $homes !== []) {
+    $activeHouse = (string) $homes[0]['token'];
+}
 
 ?>
 <!DOCTYPE html>
@@ -71,58 +81,49 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=8">
+    <link rel="stylesheet" href="assets/app.css?v=9">
     <?php appShellStyle(); ?>
 </head>
 <body>
 <?php appChrome(); ?>
-<div class="app homes">
-    <header class="top">
-        <div class="brand">
-            <div class="mark" aria-hidden="true"></div>
-            <div>
-                <p class="eyebrow">Enigma2 channel list</p>
-                <h1>E2 Stream Builder</h1>
-                <p class="lede">Stream channels keep their own address in the playlist. Satellite channels stay a TS stream from the receiver. Click a stream to play it here.</p>
+<div id="receiver" class="<?= $formError !== null || $saved ? 'is-open' : '' ?>">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="receiver-title">
+        <h2 id="receiver-title">Receiver</h2>
+        <p>The fixed playlists on this server use this address.</p>
+        <form class="toolbar" method="post" action="index.php">
+            <input type="hidden" name="save_settings" value="1">
+            <label class="field"><span>IP address</span>
+                <input name="host" value="<?= h($settings['host']) ?>" inputmode="decimal" autocomplete="off" required>
+            </label>
+            <label class="field port"><span>WebIF port</span>
+                <input name="webif_port" type="number" min="1" max="65535" value="<?= (int) $settings['webif_port'] ?>" required>
+            </label>
+            <label class="field port"><span>Stream port</span>
+                <input name="stream_port" type="number" min="1" max="65535" value="<?= (int) $settings['stream_port'] ?>" required>
+            </label>
+            <div class="actions">
+                <button class="btn primary" type="submit">Save</button>
+                <button class="btn" type="button" id="test">Test connection</button>
             </div>
-        </div>
-        <div class="status" id="status"><i></i><span>Checking connection…</span></div>
-    </header>
-    <?php appNav('playlist'); ?>
-
-    <form class="toolbar" method="post" action="index.php">
-        <input type="hidden" name="save_settings" value="1">
-        <label class="field"><span>IP address</span>
-            <input name="host" value="<?= h($settings['host']) ?>" inputmode="decimal" autocomplete="off" required>
-        </label>
-        <label class="field port"><span>WebIF port</span>
-            <input name="webif_port" type="number" min="1" max="65535" value="<?= (int) $settings['webif_port'] ?>" required>
-        </label>
-        <label class="field port"><span>Stream port</span>
-            <input name="stream_port" type="number" min="1" max="65535" value="<?= (int) $settings['stream_port'] ?>" required>
-        </label>
-        <div class="actions">
-            <button class="btn primary" type="submit">Save</button>
-            <button class="btn" type="button" id="test">Test connection</button>
-        </div>
-        <p class="<?= $formError !== null ? 'error' : ($saved ? 'oknote' : 'note') ?>" id="test-result">
-            <?php if ($formError !== null): ?>
-                <?= h($formError) ?>
-            <?php elseif ($saved): ?>
-                Settings saved.
-            <?php else: ?>
-                The fixed playlists use this address.
-            <?php endif; ?>
-        </p>
-    </form>
-
-    <section class="panel stack">
-        <h2>Houses</h2>
-        <p class="note">Each house gets its own playlist. Build it at home: open the receiver web page, then use that house’s bookmark. The stream addresses in the file use the receiver you opened. TiviMate at home loads the playlist and the shared guide from this site.</p>
+            <p class="<?= $formError !== null ? 'error' : ($saved ? 'oknote' : 'note') ?>" id="test-result">
+                <?php if ($formError !== null): ?>
+                    <?= h($formError) ?>
+                <?php elseif ($saved): ?>
+                    Settings saved.
+                <?php else: ?>
+                    Save, then test the connection.
+                <?php endif; ?>
+            </p>
+        </form>
+        <button class="btn" type="button" data-close>Close</button>
+    </div>
+</div>
+<div id="add-house" class="<?= $homeError !== null ? 'is-open' : '' ?>">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="add-house-title">
+        <h2 id="add-house-title">Add house</h2>
+        <p>Each house gets its own playlist. After you add it, this browser remembers that you are that house.</p>
         <?php if ($homeError !== null): ?>
             <p class="error"><?= h($homeError) ?></p>
-        <?php elseif ($homeSaved): ?>
-            <p class="oknote">House added. Drag its bookmark onto the bookmark bar, then open it on the receiver web page.</p>
         <?php endif; ?>
         <form class="toolbar" method="post" action="index.php">
             <input type="hidden" name="create_home" value="1">
@@ -136,31 +137,58 @@ try {
                 <button class="btn primary" type="submit">Add house</button>
             </div>
         </form>
+        <button class="btn" type="button" data-close>Close</button>
+    </div>
+</div>
+<div class="app homes">
+    <header class="menubar">
+        <a class="brand compact" href="index.php">
+            <span class="mark" aria-hidden="true"></span>
+            <strong>E2 Stream Builder</strong>
+        </a>
+        <?php appNav('playlist'); ?>
+        <label class="house-switch">
+            <span>You are</span>
+            <select id="house-pick">
+                <?php if ($homes === []): ?>
+                    <option value="">No house</option>
+                <?php endif; ?>
+                <?php foreach ($homes as $house): ?>
+                    <option value="<?= h((string) $house['token']) ?>"<?= (string) $house['token'] === $activeHouse ? ' selected' : '' ?>><?= h((string) $house['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <button class="nav-btn" type="button" id="add-house-open">Add house</button>
+        <button class="nav-btn" type="button" id="receiver-open">Receiver</button>
+        <div class="status" id="status"><i></i><span>Checking connection…</span></div>
+    </header>
+
+    <div class="housebars">
+        <?php if ($homes === []): ?>
+            <p class="note">Add a house. The menu then shows that name next to “You are”.</p>
+        <?php endif; ?>
         <?php foreach ($homes as $house): ?>
             <?php
             $token = (string) $house['token'];
             $playlistUrl = $base . '/u/' . $token . '/channels.m3u8';
             $bookmark = homeBookmarklet($token);
             ?>
-            <div class="urlbox">
-                <p class="meta"><?= h((string) $house['name']) ?> · stream port <?= (int) $house['stream_port'] ?><?= $house['host'] !== '' ? ' · ' . h((string) $house['host']) : '' ?><?= $house['built_at'] !== null && $house['built_at'] !== '' ? ' · built ' . h((string) $house['built_at']) : '' ?></p>
-                <p class="meta">Playlist</p>
-                <p class="url"><?= h($playlistUrl) ?></p>
-                <button class="btn" type="button" data-copy="<?= h($playlistUrl) ?>">Copy</button>
-                <p class="meta">Guide</p>
-                <p class="url"><?= h($media['epg']) ?></p>
-                <button class="btn" type="button" data-copy="<?= h($media['epg']) ?>">Copy</button>
-                <p class="meta">Bookmark for the receiver web page</p>
-                <p><a class="btn" href="<?= h($bookmark) ?>">Publish playlist</a></p>
+            <div class="housebar" data-house="<?= h($token) ?>"<?= $token === $activeHouse ? '' : ' hidden' ?>>
+                <p class="you">You are <?= h((string) $house['name']) ?></p>
+                <p class="meta">port <?= (int) $house['stream_port'] ?><?= $house['host'] !== '' ? ' · ' . h((string) $house['host']) : '' ?></p>
+                <p class="url slim" title="<?= h($playlistUrl) ?>"><?= h($playlistUrl) ?></p>
+                <button class="btn" type="button" data-copy="<?= h($playlistUrl) ?>">Copy playlist</button>
+                <button class="btn" type="button" data-copy="<?= h($media['epg']) ?>">Copy guide</button>
+                <a class="btn" href="<?= h($bookmark) ?>">Publish playlist</a>
                 <button class="btn" type="button" data-copy="<?= h($bookmark) ?>">Copy bookmark</button>
-                <form method="post" action="index.php">
+                <form method="post" action="index.php" onsubmit="return confirm('Remove this house?');">
                     <input type="hidden" name="delete_home" value="1">
                     <input type="hidden" name="token" value="<?= h($token) ?>">
-                    <button class="btn" type="submit">Remove house</button>
+                    <button class="btn" type="submit">Remove</button>
                 </form>
             </div>
         <?php endforeach; ?>
-    </section>
+    </div>
 
     <div class="workspace">
         <section class="panel">
@@ -240,6 +268,35 @@ try {
         </section>
     </div>
 </div>
+<script>
+(function () {
+    var pick = document.getElementById('house-pick');
+    var bars = document.querySelectorAll('.housebar');
+    if (!pick || !bars.length) return;
+    var key = 'e2-house';
+    var params = new URLSearchParams(location.search);
+    var stored = '';
+    try { stored = localStorage.getItem(key) || ''; } catch (e) {}
+    function show(token) {
+        var found = false;
+        bars.forEach(function (bar) {
+            var on = bar.getAttribute('data-house') === token;
+            bar.hidden = !on;
+            if (on) found = true;
+        });
+        if (!found && pick.options.length) {
+            token = pick.options[0].value;
+            bars.forEach(function (bar) {
+                bar.hidden = bar.getAttribute('data-house') !== token;
+            });
+        }
+        if (token) pick.value = token;
+        try { if (token) localStorage.setItem(key, token); } catch (e) {}
+    }
+    show(params.get('house') || stored || pick.value);
+    pick.addEventListener('change', function () { show(pick.value); });
+})();
+</script>
 <script src="assets/app.js?v=4"></script>
 <script src="assets/epg.js?v=3"></script>
 </body>
