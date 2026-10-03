@@ -99,7 +99,7 @@ document.addEventListener("DOMContentLoaded",function(){
     var open=document.getElementById(openId);
     if(!overlay)return;
     function show(){overlay.classList.add("is-open");}
-    function hide(){overlay.classList.remove("is-open");}
+    function hide(){if(overlay.classList.contains("is-required"))return;overlay.classList.remove("is-open");}
     if(open)open.addEventListener("click",show);
     overlay.querySelectorAll("[data-close]").forEach(function(button){button.addEventListener("click",hide);});
     overlay.addEventListener("click",function(event){if(event.target===overlay)hide();});
@@ -236,8 +236,8 @@ function appChrome(): void
         echo '<p>Each house has its own playlist. Other accounts do not see your houses.</p>';
         echo '<ol>';
         echo '<li>Log in and add a house. The address uses the house name, for example <code>/u/kilder/channels.m3u8</code>.</li>';
-        echo '<li>Open <strong>Receiver</strong>, save the receiver address, then press <strong>Publish playlist</strong>. That stores the list for the house.</li>';
-        echo '<li>In TiviMate, add that house address as a playlist.</li>';
+        echo '<li>Open <strong>Receiver</strong>, save the receiver address, then press <strong>Publish playlist</strong>. That stores the channel list and the guide for the house, and sends both addresses to your email.</li>';
+        echo '<li>In TiviMate, add the channels address as a playlist. The guide address is shown next to it.</li>';
         echo '<li><strong>Download e2.m3u8</strong> builds the selected bouquets and saves the file on your computer. It is not stored on this server.</li>';
         echo '</ol>';
     }
@@ -663,9 +663,9 @@ function disambiguatePlaylistRows(array $rows): array
 /**
  * @param array<string, true>|null $selectedRefs null = alle bouquets
  */
-function writePlaylist(array $services, ?array $selectedRefs, string $type): int
+function writePlaylist(array $services, ?array $selectedRefs, string $type, ?string $epgUrl = null): int
 {
-    $epg = mediaUrls()['epg'];
+    $epg = $epgUrl ?? mediaUrls()['epg'];
     echo '#EXTM3U url-tvg="' . $epg . '" x-tvg-url="' . $epg . "\"\n";
     $count = 0;
     $tvgIds = playlistTvgIds();
@@ -775,7 +775,8 @@ function appBaseUrl(): string
 
 function requestBaseUrl(): string
 {
-    $https = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on';
+    $https = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on')
+        || strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
     $host = (string) $_SERVER['HTTP_HOST'];
     $dir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
     $dir = rtrim($dir, '/');

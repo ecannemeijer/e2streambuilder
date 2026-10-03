@@ -39,7 +39,7 @@ $users = authUserList();
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Users · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=12">
+    <link rel="stylesheet" href="assets/app.css?v=13">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">
@@ -70,8 +70,8 @@ $users = authUserList();
                 <?= authCsrfField() ?>
                 <input type="hidden" name="save_user" value="1">
                 <input type="hidden" name="user_id" value="<?= (int) $person['id'] ?>">
-                <label class="field"><span>Username</span>
-                    <input name="username" maxlength="40" value="<?= h($person['username']) ?>" required>
+                <label class="field"><span>Email</span>
+                    <input name="username" maxlength="254" value="<?= h($person['username']) ?>" required>
                 </label>
                 <label class="field"><span>New password</span>
                     <input name="password" type="password" maxlength="200" autocomplete="new-password" placeholder="Leave blank to keep">

@@ -63,6 +63,11 @@ if ($flash['message'] !== '') {
     $authDialog = $flash['dialog'];
 }
 $authUsername = $flash['username'];
+$mailNote = null;
+if (isset($_SESSION['mail_note'])) {
+    $mailNote = (string) $_SESSION['mail_note'];
+    unset($_SESSION['mail_note']);
+}
 
 $account = authUser();
 
@@ -165,7 +170,7 @@ if ($activeHouse === '' && $homes !== []) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=12">
+    <link rel="stylesheet" href="assets/app.css?v=13">
     <?php appShellStyle(); ?>
 </head>
 <body>
@@ -212,8 +217,8 @@ if ($activeHouse === '' && $homes !== []) {
         <form class="stack" method="post" action="index.php">
             <?= authCsrfField() ?>
             <input type="hidden" name="login" value="1">
-            <label class="field"><span>Username</span>
-                <input name="username" maxlength="40" autocomplete="username" value="<?= h($authDialog === 'login' ? $authUsername : '') ?>" required>
+            <label class="field"><span>Email</span>
+                <input name="username" maxlength="254" autocomplete="username" value="<?= h($authDialog === 'login' ? $authUsername : '') ?>" required>
             </label>
             <label class="field"><span>Password</span>
                 <input name="password" type="password" maxlength="200" autocomplete="current-password" required<?= $authDialog === 'login' && $authError !== null ? ' autofocus' : '' ?>>
@@ -229,15 +234,15 @@ if ($activeHouse === '' && $homes !== []) {
 <div id="register" class="<?= $authDialog === 'register' ? 'is-open' : '' ?>">
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="register-title">
         <h2 id="register-title">Create account</h2>
-        <p>Choose a username and a password of at least 8 characters.</p>
+        <p>Use your email address and a password of at least 8 characters. A welcome message is sent to that address.</p>
         <?php if ($authDialog === 'register' && $authError !== null): ?>
             <p class="error"><?= h($authError) ?></p>
         <?php endif; ?>
         <form class="stack" method="post" action="index.php">
             <?= authCsrfField() ?>
             <input type="hidden" name="register" value="1">
-            <label class="field"><span>Username</span>
-                <input name="username" maxlength="40" autocomplete="username" value="<?= h($authDialog === 'register' ? $authUsername : '') ?>" required>
+            <label class="field"><span>Email</span>
+                <input name="username" type="email" maxlength="254" autocomplete="email" value="<?= h($authDialog === 'register' ? $authUsername : '') ?>" required>
             </label>
             <label class="field"><span>Password</span>
                 <input name="password" type="password" minlength="8" maxlength="200" autocomplete="new-password" required>
@@ -249,7 +254,7 @@ if ($activeHouse === '' && $homes !== []) {
         <button class="btn" type="button" data-close>Close</button>
     </div>
 </div>
-<div id="add-house" class="<?= $homeError !== null ? 'is-open' : '' ?>">
+<div id="add-house" class="<?= ($homeError !== null || ($account !== null && $homes === [])) ? 'is-open' : '' ?><?= ($account !== null && $homes === []) ? ' is-required' : '' ?>">
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="add-house-title">
         <h2 id="add-house-title">Add house</h2>
         <p>This house is saved on your account. Only you see its playlist address.</p>
@@ -269,7 +274,9 @@ if ($activeHouse === '' && $homes !== []) {
                 <button class="btn primary" type="submit">Add house</button>
             </div>
         </form>
-        <button class="btn" type="button" data-close>Close</button>
+        <?php if ($account === null || $homes !== []): ?>
+            <button class="btn" type="button" data-close>Close</button>
+        <?php endif; ?>
     </div>
 </div>
 <div class="app homes">
@@ -313,23 +320,35 @@ if ($activeHouse === '' && $homes !== []) {
         <?php elseif ($homes === []): ?>
             <p class="note">Add a house. The menu then shows that name next to “You are”.</p>
         <?php endif; ?>
+        <?php if ($mailNote !== null): ?>
+            <p class="<?= str_contains($mailNote, 'could not') ? 'error' : 'oknote' ?>"><?= h($mailNote) ?></p>
+        <?php endif; ?>
         <?php if ($publishError !== null): ?>
             <p class="error"><?= h($publishError) ?></p>
         <?php elseif ($publishedCount !== null): ?>
-            <p class="oknote">Playlist published. <?= (int) $publishedCount ?> channels.</p>
+            <p class="oknote">Playlist and guide published. <?= (int) $publishedCount ?> channels.</p>
         <?php endif; ?>
         <?php foreach ($homes as $house): ?>
             <?php
             $token = (string) $house['token'];
-            $playlistUrl = $base . '/u/' . rawurlencode((string) $house['slug']) . '/channels.m3u8';
+            $slug = (string) $house['slug'];
+            $playlistUrl = homeChannelsUrl($slug);
+            $guideUrl = homeGuideUrl($slug);
             $bookmark = homeBookmarklet($token);
             ?>
             <div class="housebar" data-house="<?= h($token) ?>"<?= $token === $activeHouse ? '' : ' hidden' ?>>
                 <p class="you">You are <?= h((string) $house['name']) ?></p>
-                <p class="meta">port <?= (int) $house['stream_port'] ?><?= $house['host'] !== '' ? ' · ' . h((string) $house['host']) : '' ?></p>
-                <p class="url slim" title="<?= h($playlistUrl) ?>"><?= h($playlistUrl) ?></p>
-                <button class="btn" type="button" data-copy="<?= h($playlistUrl) ?>">Copy playlist</button>
-                <button class="btn" type="button" data-copy="<?= h($media['epg']) ?>">Copy guide</button>
+                <p class="meta">Receiver <?= $house['host'] !== '' ? h((string) $house['host']) : 'not set' ?> · port <?= (int) $house['stream_port'] ?></p>
+                <div class="house-link">
+                    <span>Channels</span>
+                    <p class="url slim" title="<?= h($playlistUrl) ?>"><?= h($playlistUrl) ?></p>
+                    <button class="btn" type="button" data-copy="<?= h($playlistUrl) ?>">Copy</button>
+                </div>
+                <div class="house-link">
+                    <span>Guide</span>
+                    <p class="url slim" title="<?= h($guideUrl) ?>"><?= h($guideUrl) ?></p>
+                    <button class="btn" type="button" data-copy="<?= h($guideUrl) ?>">Copy</button>
+                </div>
                 <form method="post" action="index.php" class="slow">
                     <?= authCsrfField() ?>
                     <input type="hidden" name="publish_home" value="1">

@@ -100,14 +100,32 @@ button { cursor: pointer; }
 }
 
 .housebar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    display: grid;
     gap: 8px;
-    padding: 8px 12px;
+    padding: 12px;
     background: var(--raise);
     border: 1px solid var(--line);
     border-radius: 12px;
+}
+
+.house-link {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.house-link > span {
+    color: var(--accent);
+    font-weight: 650;
+}
+
+.house-link .url.slim {
+    max-width: none;
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal;
+    word-break: break-all;
 }
 
 .housebar .you { margin: 0; color: var(--accent); font-weight: 650; }
@@ -567,6 +585,7 @@ body.scroll .panel.stack { display: block; overflow: visible; margin-top: 14px; 
         width: 100%;
         max-height: calc(100dvh - 24px);
     }
+    .house-link { grid-template-columns: 1fr; }
 }
 
 html[data-theme="light"] {

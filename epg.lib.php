@@ -416,6 +416,40 @@ function homePlaylistPath(string $token): string
     return __DIR__ . '/data/users/' . $token . '.m3u8';
 }
 
+function homeEpgXmlPath(string $token): string
+{
+    return __DIR__ . '/data/users/' . $token . '.epg.xml';
+}
+
+function homeEpgGzPath(string $token): string
+{
+    return homeEpgXmlPath($token) . '.gz';
+}
+
+function homeChannelsUrl(string $slug): string
+{
+    return appBaseUrl() . '/u/' . rawurlencode($slug) . '/channels.m3u8';
+}
+
+function homeGuideUrl(string $slug): string
+{
+    return appBaseUrl() . '/u/' . rawurlencode($slug) . '/epg.xml.gz';
+}
+
+/** @return list<string> */
+function playlistIdsInBody(string $body): array
+{
+    preg_match_all('/tvg-id="([^"]*)"/', $body, $matches);
+    $ids = [];
+    foreach ($matches[1] as $id) {
+        if (is_string($id) && $id !== '') {
+            $ids[$id] = true;
+        }
+    }
+
+    return array_keys($ids);
+}
+
 function homeCreate(string $name, int $streamPort, int $userId): array
 {
     $name = trim($name);
@@ -466,9 +500,10 @@ function homeDelete(string $token, int $userId): void
     if ($stmt->rowCount() !== 1) {
         return;
     }
-    $path = homePlaylistPath($token);
-    if (is_file($path)) {
-        @unlink($path);
+    foreach ([homePlaylistPath($token), homeEpgXmlPath($token), homeEpgGzPath($token)] as $path) {
+        if (is_file($path)) {
+            @unlink($path);
+        }
     }
 }
 
@@ -598,6 +633,47 @@ function authUsernameOk(string $name): bool
     return preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._-]{1,39}$/', $name) === 1;
 }
 
+function authEmailOk(string $email): bool
+{
+    $email = trim($email);
+    if (strlen($email) < 6 || strlen($email) > 254 || strpbrk($email, " \t\r\n") !== false) {
+        return false;
+    }
+
+    return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+}
+
+function authSendMail(string $to, string $subject, string $body): void
+{
+    if (!authEmailOk($to)) {
+        throw new RuntimeException('This account has no email address.');
+    }
+    $headers = implode("\r\n", [
+        'MIME-Version: 1.0',
+        'Content-Type: text/plain; charset=UTF-8',
+        'From: E2 Stream Builder <noreply@e2sb.duckdns.org>',
+    ]);
+    $ok = mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, $headers);
+    if ($ok !== true) {
+        throw new RuntimeException('The email could not be sent.');
+    }
+}
+
+function authSendWelcome(string $email): void
+{
+    $base = appBaseUrl();
+    authSendMail($email, 'Welcome to E2 Stream Builder', "Welcome.\n\nYour account is ready. Log in, add a house, then press Publish playlist. The channel list and the guide are sent to this email address.\n\n" . $base . "/\n");
+}
+
+function authSendHouseLinks(string $email, string $houseName, string $channelsUrl, string $guideUrl): void
+{
+    authSendMail(
+        $email,
+        'Your playlist is ready',
+        "The playlist for " . $houseName . " is ready.\n\nChannels:\n" . $channelsUrl . "\n\nGuide:\n" . $guideUrl . "\n\nIn TiviMate, add the channels address as a playlist. Its first line points at the guide.\n"
+    );
+}
+
 /** @return array{id: int, username: string, role: string}|null */
 function authUser(): ?array
 {
@@ -661,21 +737,25 @@ function authUpdateUser(int $id, string $username, string $password, string $rol
         throw new InvalidArgumentException('This account was not found.');
     }
     $username = trim($username);
-    if (!authUsernameOk($username)) {
-        throw new InvalidArgumentException('Use a username of 2 to 40 letters, numbers, spaces, dots, hyphens or underscores.');
+    $db = epgDb();
+    $stmt = $db->prepare('SELECT id, username, role FROM users WHERE id = ?');
+    $stmt->execute([$id]);
+    $current = $stmt->fetch();
+    if (!is_array($current)) {
+        throw new InvalidArgumentException('This account was not found.');
+    }
+    $unchanged = strcasecmp($username, (string) $current['username']) === 0;
+    if (!$unchanged && !authEmailOk($username)) {
+        throw new InvalidArgumentException('Use an email address.');
+    }
+    if ($unchanged && !authEmailOk($username) && !authUsernameOk($username)) {
+        throw new InvalidArgumentException('Use an email address.');
     }
     if ($role !== 'admin' && $role !== 'user') {
         throw new InvalidArgumentException('Choose user or admin.');
     }
     if ($password !== '' && (strlen($password) < 8 || strlen($password) > 200)) {
         throw new InvalidArgumentException('Use a password of at least 8 characters.');
-    }
-    $db = epgDb();
-    $stmt = $db->prepare('SELECT id, role FROM users WHERE id = ?');
-    $stmt->execute([$id]);
-    $current = $stmt->fetch();
-    if (!is_array($current)) {
-        throw new InvalidArgumentException('This account was not found.');
     }
     if ($role !== 'admin' && (string) $current['role'] === 'admin') {
         $admins = (int) $db->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")->fetchColumn();
@@ -707,8 +787,8 @@ function authRemember(int $userId): void
 function authRegister(string $username, string $password): array
 {
     $username = trim($username);
-    if (!authUsernameOk($username)) {
-        throw new InvalidArgumentException('Use a username of 2 to 40 letters, numbers, spaces, dots, hyphens or underscores.');
+    if (!authEmailOk($username)) {
+        throw new InvalidArgumentException('Use an email address. The welcome message is sent there.');
     }
     if (strlen($password) < 8 || strlen($password) > 200) {
         throw new InvalidArgumentException('Use a password of at least 8 characters.');
@@ -740,6 +820,12 @@ function authRegister(string $username, string $password): array
     $user = authUser();
     if ($user === null) {
         throw new RuntimeException('The account could not be saved.');
+    }
+    try {
+        authSendWelcome($user['username']);
+        $_SESSION['mail_note'] = 'A welcome email was sent to ' . $user['username'] . '.';
+    } catch (Throwable $e) {
+        $_SESSION['mail_note'] = 'Your account is ready. The welcome email could not be sent.';
     }
 
     return $user;
@@ -848,8 +934,9 @@ function homePublishPlaylist(string $token, string $host, array $services): int
         'webif_port' => 80,
         'stream_port' => (int) $home['stream_port'],
     ];
+    $slug = (string) ($home['slug'] ?? '');
     ob_start();
-    $count = writePlaylist($services, null, 'all');
+    $count = writePlaylist($services, null, 'all', $slug !== '' ? homeGuideUrl($slug) : null);
     $body = ob_get_clean();
     if ($body === false || $body === '') {
         throw new RuntimeException('The playlist could not be written.');
@@ -859,6 +946,7 @@ function homePublishPlaylist(string $token, string $host, array $services): int
     if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
         throw new RuntimeException('The house folder could not be created.');
     }
+    epgGenerateXml(playlistIdsInBody($body), homeEpgXmlPath($token));
     $tmp = $path . '.tmp';
     if (file_put_contents($tmp, $body, LOCK_EX) === false) {
         throw new RuntimeException('The playlist could not be saved.');
@@ -868,8 +956,27 @@ function homePublishPlaylist(string $token, string $host, array $services): int
         throw new RuntimeException('The playlist could not be saved.');
     }
     homeMarkBuilt($token, $host);
+    homeMailPublished($token);
 
     return $count;
+}
+
+function homeMailPublished(string $token): bool
+{
+    $stmt = epgDb()->prepare('SELECT u.username, h.slug, h.name FROM homes h JOIN users u ON u.id = h.user_id WHERE h.token = ?');
+    $stmt->execute([$token]);
+    $row = $stmt->fetch();
+    if (!is_array($row) || !authEmailOk((string) $row['username'])) {
+        return false;
+    }
+    authSendHouseLinks(
+        (string) $row['username'],
+        (string) $row['name'],
+        homeChannelsUrl((string) $row['slug']),
+        homeGuideUrl((string) $row['slug'])
+    );
+
+    return true;
 }
 
 function epgRytecUrls(string $file): array
@@ -2295,12 +2402,21 @@ function epgXmlEscape(string $value): string
     return htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
 }
 
-function epgGenerateXml(): array
+function epgGenerateXml(?array $onlyIds = null, ?string $xmlPath = null): array
 {
     @ini_set('memory_limit', '512M');
     $playlist = epgPlaylistByRef();
     $wanted = [];
     $names = [];
+    if ($onlyIds !== null) {
+        foreach ($onlyIds as $id) {
+            if (!is_string($id) || $id === '') {
+                continue;
+            }
+            $wanted[$id] = true;
+            $names[$id] = $id;
+        }
+    }
     foreach (epgDb()->query("SELECT service_ref, xmltv_id FROM epg_mappings
         WHERE xmltv_id IS NOT NULL AND xmltv_id != '' AND status IN ('MATCHED', 'MANUAL')") as $row) {
         $service = $playlist[(string) $row['service_ref']] ?? null;
@@ -2308,8 +2424,11 @@ function epgGenerateXml(): array
             continue;
         }
         $id = (string) $row['xmltv_id'];
+        if ($onlyIds !== null && !isset($wanted[$id])) {
+            continue;
+        }
         $wanted[$id] = true;
-        if (!isset($names[$id])) {
+        if (!isset($names[$id]) || $names[$id] === $id) {
             $names[$id] = (string) ($service['match_name'] ?? $service['name'] ?? $id);
         }
     }
@@ -2402,21 +2521,30 @@ function epgGenerateXml(): array
     }
     fwrite($handle, "</tv>\n");
     fclose($handle);
+    $destXml = $xmlPath ?? epgXmlPath();
+    $destGz = $xmlPath === null ? epgGzPath() : $xmlPath . '.gz';
     try {
-        epgAtomicReplace($tmp, epgXmlPath());
+        epgAtomicReplace($tmp, $destXml);
         epgLog('Generating epg.xml');
-        epgGzipFile(epgXmlPath(), epgGzPath());
+        epgGzipFile($destXml, $destGz);
         epgLog('Generating epg.xml.gz');
+        if ($xmlPath !== null) {
+            @unlink($destXml);
+        }
     } catch (Throwable $e) {
         @unlink($tmp);
-        epgStateSet('generated_error', $e->getMessage());
+        if ($xmlPath === null) {
+            epgStateSet('generated_error', $e->getMessage());
+        }
         throw $e;
     }
     $channels = count($wanted);
-    epgStateSet('generated_at', epgNow());
-    epgStateSet('generated_channels', (string) $channels);
-    epgStateSet('generated_programmes', (string) $programmes);
-    epgStateSet('generated_error', '');
+    if ($xmlPath === null) {
+        epgStateSet('generated_at', epgNow());
+        epgStateSet('generated_channels', (string) $channels);
+        epgStateSet('generated_programmes', (string) $programmes);
+        epgStateSet('generated_error', '');
+    }
     epgLog('XMLTV channels: ' . $channels);
     epgLog('Programmes: ' . $programmes);
 
