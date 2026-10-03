@@ -699,13 +699,44 @@ function homeBookmarklet(string $token): string
 {
     $base = appBaseUrl();
     $script = '(function(){var token=' . json_encode($token) . ';var base=' . json_encode($base) . ';'
-        . 'fetch("/api/getallservices",{headers:{Accept:"application/json"}}).then(function(r){if(!r.ok)throw new Error("The receiver did not return the channel list.");return r.json();})'
+        . 'fetch("/api/getallservices",{headers:{Accept:"application/json"}}).then(function(r){return r.text().then(function(text){if(!r.ok||text.charAt(0)==="<")throw new Error("Open the receiver web page first, then use this bookmark.");try{return JSON.parse(text);}catch(e){throw new Error("The receiver did not return the channel list.");}});})'
         . '.then(function(data){return fetch(base+"/publish.php",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:token,host:location.hostname,services:data})});})'
         . '.then(function(r){return r.json().then(function(body){if(!r.ok)throw new Error(body.message||"Publish failed.");return body;});})'
         . '.then(function(body){alert(body.message||"Playlist published.");})'
         . '.catch(function(e){alert(e&&e.message?e.message:"Publish failed.");});})();';
 
     return 'javascript:' . rawurlencode($script);
+}
+
+/** @return array{token: string, channels: int} */
+function homePublishFromReceiver(string $token, int $userId): array
+{
+    if (!homeTokenOk($token) || $userId < 1) {
+        throw new InvalidArgumentException('This house was not found.');
+    }
+    $stmt = epgDb()->prepare('SELECT token, host, stream_port FROM homes WHERE token = ? AND user_id = ?');
+    $stmt->execute([$token, $userId]);
+    $home = $stmt->fetch();
+    if (!is_array($home)) {
+        throw new InvalidArgumentException('This house was not found.');
+    }
+    $settings = receiverSettings();
+    $host = trim((string) ($home['host'] ?? ''));
+    if ($host === '') {
+        $host = trim((string) ($settings['host'] ?? ''));
+    }
+    if (!homeHostOk($host)) {
+        throw new InvalidArgumentException('Set the receiver address under Receiver, then publish again.');
+    }
+    $GLOBALS['receiver_override'] = [
+        'host' => $host,
+        'webif_port' => (int) ($settings['webif_port'] ?? 80),
+        'stream_port' => (int) $home['stream_port'],
+    ];
+    $services = fetchAllServices();
+    $count = homePublishPlaylist($token, $host, $services);
+
+    return ['token' => $token, 'channels' => $count];
 }
 
 function homePublishPlaylist(string $token, string $host, array $services): int

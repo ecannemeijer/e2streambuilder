@@ -82,6 +82,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_home'])) {
     }
 }
 
+$publishError = null;
+$publishedCount = null;
+if (isset($_GET['published']) && ctype_digit((string) $_GET['published'])) {
+    $publishedCount = (int) $_GET['published'];
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['publish_home'])) {
+    try {
+        authCsrfCheck();
+        if ($account === null) {
+            throw new InvalidArgumentException('Log in to publish a house playlist.');
+        }
+        @set_time_limit(0);
+        $published = homePublishFromReceiver((string) ($_POST['token'] ?? ''), $account['id']);
+        header('Location: index.php?house=' . rawurlencode($published['token']) . '&published=' . $published['channels']);
+        exit;
+    } catch (InvalidArgumentException $e) {
+        $publishError = $e->getMessage();
+    } catch (Throwable $e) {
+        $publishError = $e->getMessage();
+    } finally {
+        unset($GLOBALS['receiver_override']);
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_home'])) {
     try {
         authCsrfCheck();
@@ -288,6 +313,11 @@ if ($activeHouse === '' && $homes !== []) {
         <?php elseif ($homes === []): ?>
             <p class="note">Add a house. The menu then shows that name next to “You are”.</p>
         <?php endif; ?>
+        <?php if ($publishError !== null): ?>
+            <p class="error"><?= h($publishError) ?></p>
+        <?php elseif ($publishedCount !== null): ?>
+            <p class="oknote">Playlist published. <?= (int) $publishedCount ?> channels.</p>
+        <?php endif; ?>
         <?php foreach ($homes as $house): ?>
             <?php
             $token = (string) $house['token'];
@@ -300,7 +330,12 @@ if ($activeHouse === '' && $homes !== []) {
                 <p class="url slim" title="<?= h($playlistUrl) ?>"><?= h($playlistUrl) ?></p>
                 <button class="btn" type="button" data-copy="<?= h($playlistUrl) ?>">Copy playlist</button>
                 <button class="btn" type="button" data-copy="<?= h($media['epg']) ?>">Copy guide</button>
-                <a class="btn" href="<?= h($bookmark) ?>">Publish playlist</a>
+                <form method="post" action="index.php" class="slow">
+                    <?= authCsrfField() ?>
+                    <input type="hidden" name="publish_home" value="1">
+                    <input type="hidden" name="token" value="<?= h($token) ?>">
+                    <button class="btn" type="submit">Publish playlist</button>
+                </form>
                 <button class="btn" type="button" data-copy="<?= h($bookmark) ?>">Copy bookmark</button>
                 <form method="post" action="index.php" onsubmit="return confirm('Remove this house?');">
                     <?= authCsrfField() ?>
