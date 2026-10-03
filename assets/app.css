@@ -591,7 +591,6 @@ body.scroll .panel.stack { display: block; overflow: visible; margin-top: 14px; 
         width: 100%;
         max-height: calc(100dvh - 24px);
     }
-    .house-links,
     .house-link { grid-template-columns: 1fr; }
 }
 
