@@ -175,6 +175,55 @@ button { cursor: pointer; }
 .guide-steps p:last-child { margin-bottom: 0; }
 .guide-steps .btn { margin-top: 2px; }
 
+.user-page {
+    min-height: 0;
+    overflow: auto;
+    display: grid;
+    gap: 16px;
+    align-content: start;
+    padding-bottom: 8px;
+}
+
+.user-empty,
+.user-house {
+    display: grid;
+    gap: 16px;
+}
+
+.user-house[hidden] { display: none; }
+
+.user-house-head h1,
+.user-empty h1 {
+    margin: 4px 0 6px;
+    font-size: 1.7rem;
+    letter-spacing: -0.02em;
+}
+
+.user-house-head .note,
+.user-empty p { margin: 0; color: var(--muted); }
+
+.user-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 16px;
+    align-items: start;
+}
+
+.user-card {
+    background: var(--raise);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 16px 16px 18px;
+    box-shadow: var(--shadow);
+}
+
+.user-card h2 { margin: 0 0 8px; font-size: 1.05rem; }
+.user-card > p { margin: 0 0 12px; color: var(--muted); }
+.user-card .house-links { margin-top: 4px; }
+.user-card .guide-steps { margin: 0; }
+
+.user-remove { margin: 0; justify-self: start; }
+
 .housebar .you { margin: 0; color: var(--accent); font-weight: 650; }
 .housebar .meta { margin: 0; }
 .housebar form { margin: 0; }
@@ -639,6 +688,8 @@ body.scroll .panel.stack { display: block; overflow: visible; margin-top: 14px; 
         max-height: calc(100dvh - 24px);
     }
     .house-link { grid-template-columns: 1fr; }
+    .user-grid,
+    .user-card .house-links { grid-template-columns: 1fr; }
 }
 
 .intro {

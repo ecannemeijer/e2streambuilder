@@ -234,15 +234,14 @@ function appChrome(): void
         echo '<p><strong>Xtream Codes:</strong> press <strong>Xtream</strong> next to EPG mapping. Build the list there, then in the IPTV player add a playlist, choose Xtream Codes, and paste the server URL, username and password. Each bouquet is a category, in the same order as on the receiver. The player asks this server for the stream, and the server redirects to the receiver.</p>';
         echo '<p>More detail is in <code>README.md</code>.</p>';
     } else {
-        echo '<p>The site connects to your Enigma2 receiver through OpenWebIF and reads all the bouquets and channels. Those bouquets become categories for IPTV. Each house keeps its own list. Other accounts do not see your houses.</p>';
-        echo '<p>When you publish a house, a personal <code>channels.m3u8</code> is placed on this server. Use that address in an IPTV player. Playback goes straight to the receiver, and the programme guide belongs to the same list. Each night that guide is rebuilt from the new programmes. The channel list stays as you published it.</p>';
+        echo '<p>Each house keeps a personal channel list on this server. Paste that address into an IPTV player. The player has to be on the same network as your receiver. Playback goes straight to the receiver.</p>';
+        echo '<p>The guide is stored beside the playlist and refreshes each night. The channel list changes only when you publish again. Other accounts do not see your houses.</p>';
         echo '<ol>';
-        echo '<li>Create an account with your email address and log in.</li>';
         echo '<li>Add a house. The address uses the house name, for example <code>/u/kilder/channels.m3u8</code>.</li>';
-        echo '<li>Enter the receiver address next to the house, press <strong>Save</strong>, then <strong>Publish playlist</strong>. OpenWebIF is used to read all the channels. That writes the personal playlist and the guide on this server, and sends both addresses to your email.</li>';
-        echo '<li>When the receiver is on another network, press <strong>Receiver is somewhere else</strong> and follow the three steps. Drag <strong>Publish house</strong> to the bookmarks bar, open the receiver web page, then click that bookmark. The browser reads OpenWebIF there and sends the channels to this site.</li>';
-        echo '<li>In your IPTV player, add the channels address as a playlist. The categories follow the bouquets on the receiver. The guide address is shown next to the playlist.</li>';
-        echo '<li><strong>Download e2.m3u8</strong> builds the selected bouquets and saves that copy on your computer.</li>';
+        echo '<li>Drag <strong>Publish house</strong> to the bookmarks bar. Do not click it on this website.</li>';
+        echo '<li>On the receiver’s network, open its web page in this browser, for example <code>http://192.168.1.10</code>.</li>';
+        echo '<li>Click <strong>Publish house</strong> on that page. The browser reads the channels through OpenWebIF and sends them here.</li>';
+        echo '<li>Copy the channels address and the guide address into your IPTV player. The bouquets become the categories.</li>';
         echo '</ol>';
     }
     echo '<button class="btn primary" type="button" data-close-help>Close</button>';

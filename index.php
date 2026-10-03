@@ -12,8 +12,11 @@ $saved = isset($_GET['saved']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     try {
-        $savedSettings = saveReceiverSettings($_POST);
         $actor = authUser();
+        if (!authIsAdmin($actor)) {
+            throw new InvalidArgumentException('Only an admin can save the receiver.');
+        }
+        $savedSettings = saveReceiverSettings($_POST);
         $savedToken = (string) ($_POST['token'] ?? '');
         if ($actor !== null && homeTokenOk($savedToken)) {
             epgDb()->prepare('UPDATE homes SET host = ?, stream_port = ? WHERE token = ? AND user_id = ?')
@@ -87,7 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_home'])) {
         if ($account === null) {
             throw new InvalidArgumentException('Log in to add a house.');
         }
-        $created = homeCreate((string) ($_POST['house_name'] ?? ''), (int) ($_POST['house_stream_port'] ?? 8001), $account['id']);
+        $streamPort = authIsAdmin($account) ? (int) ($_POST['house_stream_port'] ?? 8001) : 8001;
+        $created = homeCreate((string) ($_POST['house_name'] ?? ''), $streamPort, $account['id']);
         header('Location: index.php?house=' . rawurlencode((string) $created['token']));
         exit;
     } catch (InvalidArgumentException $e) {
@@ -106,8 +110,8 @@ if (isset($_GET['published']) && ctype_digit((string) $_GET['published'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['publish_home'])) {
     try {
         authCsrfCheck();
-        if ($account === null) {
-            throw new InvalidArgumentException('Log in to publish a house playlist.');
+        if (!authIsAdmin($account)) {
+            throw new InvalidArgumentException('Only an admin can publish from this server.');
         }
         @set_time_limit(0);
         $published = homePublishFromReceiver((string) ($_POST['token'] ?? ''), $account['id']);
@@ -135,11 +139,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_home'])) {
     }
 }
 
-$settings = $account === null ? null : receiverSettings();
+$isAdmin = authIsAdmin($account);
+$settings = $isAdmin ? receiverSettings() : null;
 $error = null;
 $bouquets = [];
 
-if ($account !== null) {
+if ($isAdmin) {
     try {
         $bouquets = fetchBouquets();
     } catch (Throwable $e) {
@@ -182,7 +187,7 @@ if ($activeHouse === '' && $homes !== []) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=19">
+    <link rel="stylesheet" href="assets/app.css?v=20">
     <?php appShellStyle(); ?>
 </head>
 <body>
@@ -247,9 +252,13 @@ if ($activeHouse === '' && $homes !== []) {
             <label class="field"><span>House name</span>
                 <input name="house_name" maxlength="80" required>
             </label>
+            <?php if ($isAdmin): ?>
             <label class="field port"><span>Stream port</span>
                 <input name="house_stream_port" type="number" min="1" max="65535" value="8001" required>
             </label>
+            <?php else: ?>
+            <input type="hidden" name="house_stream_port" value="8001">
+            <?php endif; ?>
             <div class="actions">
                 <button class="btn primary" type="submit">Add house</button>
             </div>
@@ -259,6 +268,7 @@ if ($activeHouse === '' && $homes !== []) {
         <?php endif; ?>
     </div>
 </div>
+<?php if ($isAdmin): ?>
 <div id="remote">
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="remote-title">
         <h2 id="remote-title">Receiver is somewhere else</h2>
@@ -293,6 +303,7 @@ if ($activeHouse === '' && $homes !== []) {
         <button class="btn" type="button" data-close>Close</button>
     </div>
 </div>
+<?php endif; ?>
 <div class="app homes">
     <header class="menubar">
         <a class="brand compact" href="index.php">
@@ -327,7 +338,7 @@ if ($activeHouse === '' && $homes !== []) {
     <div class="housebars">
         <?php if ($authError !== null): ?>
             <p class="error"><?= h($authError) ?></p>
-        <?php elseif ($account !== null && $homes === []): ?>
+        <?php elseif ($isAdmin && $homes === []): ?>
             <p class="note">Add a house. The menu then shows that name next to “You are”.</p>
         <?php endif; ?>
         <?php if ($mailNote !== null): ?>
@@ -343,6 +354,7 @@ if ($activeHouse === '' && $homes !== []) {
         <?php elseif ($publishedCount !== null): ?>
             <p class="oknote">Playlist and guide published. <?= (int) $publishedCount ?> channels.</p>
         <?php endif; ?>
+        <?php if ($isAdmin): ?>
         <?php foreach ($homes as $house): ?>
             <?php
             $token = (string) $house['token'];
@@ -398,6 +410,7 @@ if ($activeHouse === '' && $homes !== []) {
                 </div>
             </div>
         <?php endforeach; ?>
+        <?php endif; ?>
     </div>
 
     <?php if ($account === null): ?>
@@ -434,8 +447,8 @@ if ($activeHouse === '' && $homes !== []) {
             </article>
         </div>
     </section>
-    <?php else: ?>
-    <div class="workspace<?= authIsAdmin($account) ? '' : ' two' ?>">
+    <?php elseif ($isAdmin): ?>
+    <div class="workspace">
         <section class="panel">
             <h2>Bouquets</h2>
             <?php if ($error !== null): ?>
@@ -514,12 +527,93 @@ if ($activeHouse === '' && $homes !== []) {
         </section>
         <?php endif; ?>
     </div>
+    <?php else: ?>
+    <div class="user-page">
+        <?php if ($homes === []): ?>
+            <section class="user-empty">
+                <p class="eyebrow">Your house</p>
+                <h1>Add a house to publish your channels.</h1>
+                <p>The playlist and the guide for that house stay on this server. Only you can see them.</p>
+            </section>
+        <?php endif; ?>
+        <?php foreach ($homes as $house): ?>
+            <?php
+            $token = (string) $house['token'];
+            $slug = (string) $house['slug'];
+            $playlistUrl = homeChannelsUrl($slug);
+            $guideUrl = homeGuideUrl($slug);
+            $bookmark = homeBookmarklet($token);
+            $built = trim((string) ($house['built_at'] ?? ''));
+            ?>
+            <article class="user-house" data-house="<?= h($token) ?>"<?= $token === $activeHouse ? '' : ' hidden' ?>>
+                <header class="user-house-head">
+                    <p class="eyebrow"><?= h((string) $house['name']) ?></p>
+                    <h1>Your playlist</h1>
+                    <p class="note"><?= $built !== '' ? 'Last published ' . h($built) . '.' : 'Not published yet.' ?></p>
+                </header>
+                <div class="user-grid">
+                    <section class="user-card">
+                        <h2>Player addresses</h2>
+                        <p>Paste both addresses into your IPTV player. The player has to be on the same network as the receiver. The guide refreshes each night. The channel list changes only when you publish again.</p>
+                        <div class="house-links">
+                            <div class="house-link">
+                                <span>Channels</span>
+                                <p class="url slim" title="<?= h($playlistUrl) ?>"><?= h($playlistUrl) ?></p>
+                                <button class="btn" type="button" data-copy="<?= h($playlistUrl) ?>">Copy</button>
+                            </div>
+                            <div class="house-link">
+                                <span>Guide</span>
+                                <p class="url slim" title="<?= h($guideUrl) ?>"><?= h($guideUrl) ?></p>
+                                <button class="btn" type="button" data-copy="<?= h($guideUrl) ?>">Copy</button>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="user-card">
+                        <h2>Publish the channels</h2>
+                        <div class="guide-steps">
+                            <article>
+                                <span class="step">1</span>
+                                <div>
+                                    <h3>Save the bookmark</h3>
+                                    <p>Drag <strong>Publish house</strong> onto the bookmarks bar. Do not click it on this page. Press Ctrl+Shift+B if that bar is hidden.</p>
+                                    <p><a class="btn primary bookmark-drag" href="<?= h($bookmark) ?>">Publish house</a></p>
+                                    <p class="error bookmark-note" hidden>This button is only for dragging. Open the receiver web page, then click the bookmark there.</p>
+                                    <p>If you cannot drag it, press Copy. In Chrome press Ctrl+D, then More, replace URL with the copied text, name it Publish house, and press Done. The address starts with <code>javascript:</code>.</p>
+                                    <p><button class="btn" type="button" data-copy="<?= h($bookmark) ?>">Copy</button></p>
+                                </div>
+                            </article>
+                            <article>
+                                <span class="step">2</span>
+                                <div>
+                                    <h3>Open the receiver</h3>
+                                    <p>On the receiver’s network, open its web page in this browser, for example <code>http://192.168.1.10</code>.</p>
+                                </div>
+                            </article>
+                            <article>
+                                <span class="step">3</span>
+                                <div>
+                                    <h3>Click the bookmark</h3>
+                                    <p>Click <strong>Publish house</strong> on that page. The browser reads the channels through OpenWebIF and sends them here. A message appears when the list is stored.</p>
+                                </div>
+                            </article>
+                        </div>
+                    </section>
+                </div>
+                <form class="user-remove" method="post" action="index.php" onsubmit="return confirm('Remove this house?');">
+                    <?= authCsrfField() ?>
+                    <input type="hidden" name="delete_home" value="1">
+                    <input type="hidden" name="token" value="<?= h($token) ?>">
+                    <button class="btn" type="submit">Remove house</button>
+                </form>
+            </article>
+        <?php endforeach; ?>
+    </div>
     <?php endif; ?>
 </div>
 <script>
 (function () {
     var pick = document.getElementById('house-pick');
-    var bars = document.querySelectorAll('.housebar');
+    var bars = document.querySelectorAll('.housebar, .user-house');
     if (!pick || !bars.length) return;
     var key = 'e2-house';
     var params = new URLSearchParams(location.search);
@@ -560,9 +654,18 @@ if ($activeHouse === '' && $homes !== []) {
             if (copy) copy.setAttribute('data-copy', bookmark);
         });
     });
+    document.querySelectorAll('.bookmark-drag').forEach(function (link) {
+        link.addEventListener('click', function (event) {
+            event.preventDefault();
+            var card = link.closest('.user-house');
+            var clickNote = card ? card.querySelector('.bookmark-note') : null;
+            if (clickNote) clickNote.hidden = false;
+            return false;
+        });
+    });
 })();
 </script>
-<script src="assets/app.js?v=7"></script>
+<script src="assets/app.js?v=8"></script>
 <script src="assets/epg.js?v=3"></script>
 </body>
 </html>

@@ -339,4 +339,6 @@ video?.addEventListener('playing', hidePlaceholder);
 
 refreshBouquetCount();
 if (statusNodes.length) loadStatus();
-document.getElementById('house-pick')?.addEventListener('change', () => loadStatus());
+document.getElementById('house-pick')?.addEventListener('change', () => {
+    if (statusNodes.length) loadStatus();
+});

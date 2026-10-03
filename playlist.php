@@ -25,10 +25,10 @@ if (requestWantsPublishedPlaylist() && !isset($_REQUEST['filter']) && is_file($p
 if (isset($_REQUEST['filter']) || isset($_REQUEST['download'])) {
     require_once __DIR__ . '/epg.lib.php';
     authStart();
-    if (authUser() === null) {
-        http_response_code(401);
+    if (!authIsAdmin()) {
+        http_response_code(403);
         header('Content-Type: text/plain; charset=utf-8');
-        echo 'Log in to download a playlist.';
+        echo 'Only an admin can download this playlist.';
         exit;
     }
 }

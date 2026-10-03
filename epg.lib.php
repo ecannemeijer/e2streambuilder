@@ -663,7 +663,7 @@ function authSendMail(string $to, string $subject, string $body): void
 function authSendWelcome(string $email): void
 {
     $base = appBaseUrl();
-    authSendMail($email, 'Welcome to E2 Stream Builder', "Welcome.\n\nYour account is ready. Log in, add a house, then press Publish playlist. The channel list and the guide are sent to this email address.\n\n" . $base . "/\n");
+    authSendMail($email, 'Welcome to E2 Stream Builder', "Welcome.\n\nYour account is ready. Log in, add a house, then drag Publish house to the bookmarks bar. Open the receiver web page and click that bookmark. The channel list and the guide are sent to this email address.\n\n" . $base . "/\n");
 }
 
 function authSendHouseLinks(string $email, string $houseName, string $channelsUrl, string $guideUrl): void

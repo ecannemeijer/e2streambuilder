@@ -5,9 +5,9 @@ require_once __DIR__ . '/epg.lib.php';
 header('Content-Type: application/json; charset=utf-8');
 
 authStart();
-if (authUser() === null) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Log in to see channels.'], JSON_UNESCAPED_UNICODE);
+if (!authIsAdmin()) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Only an admin can see channels.'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
