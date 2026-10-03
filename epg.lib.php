@@ -776,6 +776,32 @@ function authUpdateUser(int $id, string $username, string $password, string $rol
     }
 }
 
+function authDeleteUser(int $id): void
+{
+    if ($id < 1) {
+        throw new InvalidArgumentException('This account was not found.');
+    }
+    $db = epgDb();
+    $stmt = $db->prepare('SELECT id, role FROM users WHERE id = ?');
+    $stmt->execute([$id]);
+    $current = $stmt->fetch();
+    if (!is_array($current)) {
+        throw new InvalidArgumentException('This account was not found.');
+    }
+    if ((string) $current['role'] === 'admin') {
+        $admins = (int) $db->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")->fetchColumn();
+        if ($admins < 2) {
+            throw new InvalidArgumentException('Keep at least one admin.');
+        }
+    }
+    $homes = $db->prepare('SELECT token FROM homes WHERE user_id = ?');
+    $homes->execute([$id]);
+    foreach ($homes as $home) {
+        homeDelete((string) $home['token'], $id);
+    }
+    $db->prepare('DELETE FROM users WHERE id = ?')->execute([$id]);
+}
+
 function authRemember(int $userId): void
 {
     authStart();

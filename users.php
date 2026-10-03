@@ -25,8 +25,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_user'])) {
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user'])) {
+    try {
+        authCsrfCheck();
+        $removeId = (int) ($_POST['user_id'] ?? 0);
+        $actor = authUser();
+        authDeleteUser($removeId);
+        if (is_array($actor) && (int) $actor['id'] === $removeId) {
+            authLogout();
+            header('Location: index.php');
+            exit;
+        }
+        header('Location: users.php?removed=1');
+        exit;
+    } catch (InvalidArgumentException $e) {
+        $error = $e->getMessage();
+    } catch (Throwable $e) {
+        $error = $e->getMessage();
+    }
+}
+
 if (isset($_GET['saved'])) {
     $notice = 'Account saved.';
+}
+if (isset($_GET['removed'])) {
+    $notice = 'Account removed.';
 }
 
 $users = authUserList();
@@ -51,7 +74,7 @@ $users = authUserList();
             <div>
                 <p class="eyebrow">E2 Stream Builder</p>
                 <h1>Users</h1>
-                <p class="lede">Change a username, set a new password, or make an account an admin. A new account is always a user.</p>
+                <p class="lede">Change an email address, set a new password, make an account an admin, or remove it. Removing an account also removes its houses. A new account is always a user.</p>
             </div>
         </div>
     </header>
@@ -84,7 +107,13 @@ $users = authUserList();
                 </label>
                 <div class="actions">
                     <button class="btn primary" type="submit">Save</button>
+                    <button class="btn" type="submit" form="remove-user-<?= (int) $person['id'] ?>">Remove</button>
                 </div>
+            </form>
+            <form id="remove-user-<?= (int) $person['id'] ?>" method="post" action="users.php" onsubmit="return confirm('Remove this account and its houses?');">
+                <?= authCsrfField() ?>
+                <input type="hidden" name="delete_user" value="1">
+                <input type="hidden" name="user_id" value="<?= (int) $person['id'] ?>">
             </form>
         <?php endforeach; ?>
     </section>
