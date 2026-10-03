@@ -268,8 +268,9 @@ if ($activeHouse === '' && $homes !== []) {
                 <span class="step">1</span>
                 <div>
                     <h3>Save the bookmark</h3>
-                    <p>Drag <strong>Publish house</strong> onto the bookmarks bar. Press Ctrl+Shift+B if that bar is hidden.</p>
+                    <p>Drag <strong>Publish house</strong> onto the bookmarks bar. Do not click it on this page. Press Ctrl+Shift+B if that bar is hidden.</p>
                     <p><a class="btn primary" id="remote-drag" href="#">Publish house</a></p>
+                    <p class="error" id="remote-click-note" hidden>This button is only for dragging. Open the receiver web page, then click the bookmark there.</p>
                     <p>If you cannot drag it, press Copy. In Chrome press Ctrl+D, then More, replace URL with the copied text, name it Publish house, and press Done. The address starts with <code>javascript:</code>.</p>
                     <p><button class="btn" type="button" id="remote-copy" data-copy="">Copy</button></p>
                 </div>
@@ -546,7 +547,12 @@ if ($activeHouse === '' && $homes !== []) {
 (function () {
     var drag = document.getElementById('remote-drag');
     var copy = document.getElementById('remote-copy');
-    if (drag) drag.addEventListener('click', function (event) { event.preventDefault(); });
+    var note = document.getElementById('remote-click-note');
+    if (drag) drag.addEventListener('click', function (event) {
+        event.preventDefault();
+        if (note) note.hidden = false;
+        return false;
+    });
     document.querySelectorAll('[data-open="remote"]').forEach(function (button) {
         button.addEventListener('click', function () {
             var bookmark = button.getAttribute('data-bookmark') || '';

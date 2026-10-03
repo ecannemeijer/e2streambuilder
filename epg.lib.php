@@ -904,11 +904,11 @@ function homeBookmarklet(string $token): string
 {
     $base = appBaseUrl();
     $script = '(function(){var token=' . json_encode($token) . ';var base=' . json_encode($base) . ';'
-        . 'fetch("/api/getallservices",{headers:{Accept:"application/json"}}).then(function(r){return r.text().then(function(text){if(!r.ok||text.charAt(0)==="<")throw new Error("Open the receiver web page first, then use this bookmark.");try{return JSON.parse(text);}catch(e){throw new Error("The receiver did not return the channel list.");}});})'
-        . '.then(function(data){return fetch(base+"/publish.php",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:token,host:location.hostname,services:data})});})'
-        . '.then(function(r){return r.json().then(function(body){if(!r.ok)throw new Error(body.message||"Publish failed.");return body;});})'
+        . 'try{if(location.hostname===(new URL(base)).hostname){alert("Open the receiver web page first. This bookmark only works on that page, not on this website.");return;}}catch(err){}'
+        . 'fetch("/api/getallservices",{headers:{Accept:"application/json"}}).then(function(r){return r.text().then(function(text){if(!r.ok||text.charAt(0)==="<")throw new Error("Open the receiver web page first, then click this bookmark.");try{return JSON.parse(text);}catch(e){throw new Error("The receiver did not return the channel list.");}});},function(){throw new Error("Open the receiver web page first, then click this bookmark.");})'
+        . '.then(function(data){var body=JSON.stringify({token:token,host:location.hostname,services:data});var packed=Promise.resolve({body:body,headers:{"Content-Type":"application/json"}});if(typeof CompressionStream==="function"){packed=new Response(new Blob([body]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer().then(function(buf){return {body:buf,headers:{"Content-Type":"application/json","Content-Encoding":"gzip"}};});}return packed.then(function(pack){return fetch(base+"/publish.php",{method:"POST",headers:pack.headers,body:pack.body}).then(function(r){return r.json().then(function(res){if(!r.ok)throw new Error(res.message||"Publish failed.");return res;});},function(){throw new Error("The channel list could not be sent to the website.");});});})'
         . '.then(function(body){alert(body.message||"Playlist published.");})'
-        . '.catch(function(e){alert(e&&e.message?e.message:"Publish failed.");});})();';
+        . '.catch(function(e){alert(e&&e.message&&e.message!=="Failed to fetch"?e.message:"Open the receiver web page first, then click this bookmark.");});})();';
 
     return 'javascript:' . rawurlencode($script);
 }

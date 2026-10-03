@@ -4,7 +4,7 @@ require_once __DIR__ . '/epg.lib.php';
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Content-Encoding');
 header('Content-Type: application/json; charset=utf-8');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -23,6 +23,15 @@ if (!is_string($raw) || strlen($raw) > 32 * 1024 * 1024) {
     http_response_code(413);
     echo json_encode(['ok' => false, 'message' => 'The channel list is too large.'], JSON_UNESCAPED_UNICODE);
     exit;
+}
+if (strtolower(trim((string) ($_SERVER['HTTP_CONTENT_ENCODING'] ?? ''))) === 'gzip') {
+    $decoded = gzdecode($raw);
+    if (!is_string($decoded) || strlen($decoded) > 32 * 1024 * 1024) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'message' => 'The channel list could not be read.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $raw = $decoded;
 }
 
 try {
