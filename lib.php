@@ -217,7 +217,7 @@ function appChrome(): void
     echo '<h2 id="help-title">How this works</h2>';
     $admin = function_exists('authIsAdmin') && authIsAdmin();
     if ($admin) {
-        echo '<p>This site turns your Enigma2 receiver into a playlist for an IPTV player, and adds a programme guide. Bouquets and the channels inside them become categories in that list.</p>';
+        echo '<p>This site connects to your Enigma2 receiver through OpenWebIF and reads all the bouquets and channels. It turns them into a playlist for an IPTV player, and adds a programme guide. Each bouquet becomes a category in that list.</p>';
         echo '<p>Publishing a house stores a personal <code>channels.m3u8</code> on this server. Paste that address into an IPTV player. Playback goes straight to the receiver.</p>';
         echo '<ol>';
         echo '<li>Enter the receiver address next to the house and save.</li>';
@@ -232,12 +232,12 @@ function appChrome(): void
         echo '<p><strong>Xtream Codes:</strong> press <strong>Xtream</strong> next to EPG mapping. Build the list there, then in the IPTV player add a playlist, choose Xtream Codes, and paste the server URL, username and password. Each bouquet is a category, in the same order as on the receiver. The player asks this server for the stream, and the server redirects to the receiver.</p>';
         echo '<p>More detail is in <code>README.md</code>.</p>';
     } else {
-        echo '<p>Bouquets on the receiver, and the channels inside them, become categories for IPTV. Each house keeps its own list. Other accounts do not see your houses.</p>';
+        echo '<p>The site connects to your Enigma2 receiver through OpenWebIF and reads all the bouquets and channels. Those bouquets become categories for IPTV. Each house keeps its own list. Other accounts do not see your houses.</p>';
         echo '<p>When you publish a house, a personal <code>channels.m3u8</code> is placed on this server. Use that address in an IPTV player. Playback goes straight to the receiver, and the programme guide belongs to the same list.</p>';
         echo '<ol>';
         echo '<li>Create an account with your email address and log in.</li>';
         echo '<li>Add a house. The address uses the house name, for example <code>/u/kilder/channels.m3u8</code>.</li>';
-        echo '<li>Enter the receiver address next to the house, press <strong>Save</strong>, then <strong>Publish playlist</strong>. That writes the personal playlist and the guide on this server, and sends both addresses to your email.</li>';
+        echo '<li>Enter the receiver address next to the house, press <strong>Save</strong>, then <strong>Publish playlist</strong>. OpenWebIF is used to read all the channels. That writes the personal playlist and the guide on this server, and sends both addresses to your email.</li>';
         echo '<li>In your IPTV player, add the channels address as a playlist. The categories follow the bouquets on the receiver. The guide address is shown next to the playlist.</li>';
         echo '<li><strong>Download e2.m3u8</strong> builds the selected bouquets and saves that copy on your computer.</li>';
         echo '</ol>';

@@ -369,7 +369,7 @@ if ($activeHouse === '' && $homes !== []) {
         <div class="intro-hero">
             <p class="eyebrow">Enigma2 for IPTV</p>
             <h1>Your channels, ready for an IPTV player.</h1>
-            <p class="lead">E2 Stream Builder reads the bouquets and channels on an Enigma2 receiver and turns them into IPTV categories. For each house it places a personal channels.m3u8 on this server, ready to open in an IPTV player. Playback goes straight to the receiver, with a programme guide for the same list.</p>
+            <p class="lead">E2 Stream Builder connects to your Enigma2 receiver through OpenWebIF and reads all the bouquets and channels. It turns them into IPTV categories. For each house it places a personal channels.m3u8 on this server, ready to open in an IPTV player. Playback goes straight to the receiver, with a programme guide for the same list.</p>
             <div class="intro-actions">
                 <button class="btn primary" type="button" data-open="register">Create account</button>
                 <button class="btn" type="button" data-open="login">Log in</button>
@@ -384,7 +384,7 @@ if ($activeHouse === '' && $homes !== []) {
             <article>
                 <span class="step">2</span>
                 <h2>Categories</h2>
-                <p>Each bouquet becomes an IPTV category. The channels in that bouquet stay together, in the same order as on the receiver.</p>
+                <p>OpenWebIF supplies every bouquet and channel. Each bouquet becomes an IPTV category, with its channels kept together in the same order as on the receiver.</p>
             </article>
             <article>
                 <span class="step">3</span>
