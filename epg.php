@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     epgRematchAll();
                     epgGenerateXml();
                 } catch (Throwable $e) {
-                    $counts['followup'] = $e->getMessage();
+                    $counts['followup'] = authHiddenError($e);
                 }
 
                 return $counts;
@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } catch (Throwable $e) {
-        $error = $e->getMessage();
+        $error = authHiddenError($e);
     }
 }
 

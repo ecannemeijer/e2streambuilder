@@ -1,6 +1,14 @@
 <?php
 
-require_once __DIR__ . '/lib.php';
+require_once __DIR__ . '/epg.lib.php';
+
+authStart();
+if (!authIsAdmin()) {
+    http_response_code(403);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo "Only an admin can test a stream.\n";
+    exit;
+}
 
 set_time_limit(0);
 

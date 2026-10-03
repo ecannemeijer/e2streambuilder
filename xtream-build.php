@@ -33,7 +33,7 @@ try {
     } catch (Throwable $ignored) {
     }
     if ($progress) {
-        epgProgressEmit($e->getMessage(), true, true, $return . '?xtream=1');
+        epgProgressEmit(authHiddenError($e), true, true, $return . '?xtream=1');
         exit;
     }
     header('Location: ' . $return . '?xtream=1');

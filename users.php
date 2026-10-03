@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_user'])) {
     } catch (InvalidArgumentException $e) {
         $error = $e->getMessage();
     } catch (Throwable $e) {
-        $error = $e->getMessage();
+        $error = authHiddenError($e);
     }
 }
 
@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user'])) {
     } catch (InvalidArgumentException $e) {
         $error = $e->getMessage();
     } catch (Throwable $e) {
-        $error = $e->getMessage();
+        $error = authHiddenError($e);
     }
 }
 

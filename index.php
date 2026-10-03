@@ -12,6 +12,7 @@ $saved = isset($_GET['saved']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     try {
+        authCsrfCheck();
         $actor = authUser();
         if (!authIsAdmin($actor)) {
             throw new InvalidArgumentException('Only an admin can save the receiver.');
@@ -31,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     } catch (InvalidArgumentException $e) {
         $formError = $e->getMessage();
     } catch (Throwable $e) {
-        $formError = $e->getMessage();
+        $formError = authHiddenError($e);
     }
 }
 
@@ -97,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_home'])) {
     } catch (InvalidArgumentException $e) {
         $homeError = $e->getMessage();
     } catch (Throwable $e) {
-        $homeError = $e->getMessage();
+        $homeError = authHiddenError($e);
     }
 }
 
@@ -120,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['publish_home'])) {
     } catch (InvalidArgumentException $e) {
         $publishError = $e->getMessage();
     } catch (Throwable $e) {
-        $publishError = $e->getMessage();
+        $publishError = authHiddenError($e);
     } finally {
         unset($GLOBALS['receiver_override']);
     }
@@ -155,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_house'])) {
     } catch (InvalidArgumentException $e) {
         $houseError = $e->getMessage();
     } catch (Throwable $e) {
-        $houseError = $e->getMessage();
+        $houseError = authHiddenError($e);
     }
 }
 
@@ -200,7 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
     } catch (InvalidArgumentException $e) {
         authFail('password', $e->getMessage());
     } catch (Throwable $e) {
-        authFail('password', $e->getMessage());
+        authFail('password', authHiddenError($e));
     }
 }
 
@@ -216,7 +217,7 @@ if ($isAdmin) {
     try {
         $bouquets = fetchBouquets();
     } catch (Throwable $e) {
-        $error = $e->getMessage();
+        $error = authHiddenError($e);
     }
 }
 
@@ -232,7 +233,7 @@ try {
     $homes = $account === null ? [] : homeList($account['id']);
 } catch (Throwable $e) {
     if ($homeError === null) {
-        $homeError = $e->getMessage();
+        $homeError = authHiddenError($e);
     }
 }
 $requestedHouse = (string) ($_GET['house'] ?? '');
@@ -488,6 +489,7 @@ if ($activeHouse === '' && $homes !== []) {
                 </div>
                 <div class="house-actions">
                     <form class="receiver-inline" method="post" action="index.php">
+                        <?= authCsrfField() ?>
                         <input type="hidden" name="save_settings" value="1">
                         <input type="hidden" name="token" value="<?= h($token) ?>">
                         <label class="field"><span>Receiver</span>

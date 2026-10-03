@@ -26,7 +26,7 @@ try {
     exit;
 } catch (Throwable $e) {
     http_response_code(502);
-    echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['error' => authHiddenError($e)], JSON_UNESCAPED_UNICODE);
     exit;
 }
 

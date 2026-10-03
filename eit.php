@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['action'] ?? '') =
         $notice = 'EIT guide created. Channels: ' . epgFormatNumber((int) $result['channels'])
             . '. Programmes: ' . epgFormatNumber((int) $result['programmes']) . '.';
     } catch (Throwable $e) {
-        $error = $e->getMessage();
+        $error = authHiddenError($e);
     }
 }
 

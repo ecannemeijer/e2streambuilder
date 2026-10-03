@@ -359,6 +359,15 @@ function epgMigrate(PDO $db): void
         $db->exec("UPDATE users SET role = 'admin' WHERE username = 'diesel431' COLLATE NOCASE");
         $db->exec('INSERT INTO epg_schema (version) VALUES (7)');
     }
+    if ($version < 8) {
+        $db->exec('CREATE TABLE IF NOT EXISTS auth_attempts (
+            address TEXT NOT NULL,
+            action TEXT NOT NULL,
+            failed_at TEXT NOT NULL
+        )');
+        $db->exec('CREATE INDEX IF NOT EXISTS auth_attempts_lookup ON auth_attempts(address, action, failed_at)');
+        $db->exec('INSERT INTO epg_schema (version) VALUES (8)');
+    }
     epgSeedSources();
 }
 
@@ -476,6 +485,11 @@ function homeCreate(string $name, int $streamPort, int $userId): array
     }
     if ($streamPort < 1 || $streamPort > 65535) {
         throw new InvalidArgumentException('The stream port must be between 1 and 65535.');
+    }
+    $count = epgDb()->prepare('SELECT COUNT(*) FROM homes WHERE user_id = ?');
+    $count->execute([$userId]);
+    if ((int) $count->fetchColumn() >= 20) {
+        throw new InvalidArgumentException('This account already has 20 houses.');
     }
     $slug = homeSlugFromName($name);
     if (!homeSlugOk($slug)) {
@@ -763,6 +777,8 @@ function authChangePassword(int $userId, string $current, string $next): void
     }
     epgDb()->prepare('UPDATE users SET password_hash = ? WHERE id = ?')
         ->execute([password_hash($next, PASSWORD_DEFAULT), $userId]);
+    authStart();
+    session_regenerate_id(true);
 }
 
 function authUpdateUser(int $id, string $username, string $password, string $role): void
@@ -846,6 +862,17 @@ function authRemember(int $userId): void
 
 function authRegister(string $username, string $password): array
 {
+    authThrottleGate('register');
+    try {
+        return authRegisterAccount($username, $password);
+    } catch (Throwable $e) {
+        authThrottleNote('register');
+        throw $e;
+    }
+}
+
+function authRegisterAccount(string $username, string $password): array
+{
     $username = trim($username);
     if (!authEmailOk($username)) {
         throw new InvalidArgumentException('Use an email address. The welcome message is sent there.');
@@ -891,14 +918,41 @@ function authRegister(string $username, string $password): array
     return $user;
 }
 
+function authClientAddress(): string
+{
+    $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+
+    return filter_var($ip, FILTER_VALIDATE_IP) ? $ip : '0.0.0.0';
+}
+
+function authThrottleGate(string $action): void
+{
+    $db = epgDb();
+    $db->prepare('DELETE FROM auth_attempts WHERE failed_at < ?')->execute([date('Y-m-d H:i:s', time() - 3600)]);
+    $stmt = $db->prepare('SELECT COUNT(*) FROM auth_attempts WHERE address = ? AND action = ? AND failed_at >= ?');
+    $stmt->execute([authClientAddress(), $action, date('Y-m-d H:i:s', time() - 900)]);
+    $count = (int) $stmt->fetchColumn();
+    if ($count >= 5) {
+        sleep(min(8, 2 + ($count - 5)));
+    }
+}
+
+function authThrottleNote(string $action): void
+{
+    epgDb()->prepare('INSERT INTO auth_attempts (address, action, failed_at) VALUES (?, ?, ?)')
+        ->execute([authClientAddress(), $action, epgNow()]);
+}
+
 function authLogin(string $username, string $password): array
 {
+    authThrottleGate('login');
     $username = trim($username);
     $stmt = epgDb()->prepare('SELECT id, password_hash FROM users WHERE username = ? COLLATE NOCASE');
     $stmt->execute([$username]);
     $row = $stmt->fetch();
     $hash = is_array($row) ? (string) $row['password_hash'] : '';
     if ($hash === '' || !password_verify($password, $hash)) {
+        authThrottleNote('login');
         throw new InvalidArgumentException('The username or password is wrong. Create an account first if you do not have one.');
     }
     authRemember((int) $row['id']);

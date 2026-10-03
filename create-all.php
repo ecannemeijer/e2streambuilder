@@ -40,7 +40,7 @@ try {
     header('Location: index.php');
 } catch (Throwable $e) {
     if ($progress) {
-        epgProgressEmit($e->getMessage(), true, true);
+        epgProgressEmit(authHiddenError($e), true, true);
         exit;
     }
     header('Location: index.php');

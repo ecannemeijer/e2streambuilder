@@ -7,6 +7,25 @@ function h(string $value): string
     return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 }
 
+function authHiddenError(Throwable $e): string
+{
+    error_log('e2sb: ' . $e->getMessage());
+
+    return 'Something went wrong. Try again.';
+}
+
+function authSecurityHeaders(): void
+{
+    if (PHP_SAPI === 'cli' || headers_sent()) {
+        return;
+    }
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: DENY');
+    header('Referrer-Policy: same-origin');
+}
+
+authSecurityHeaders();
+
 function appNav(string $active): void
 {
     $admin = function_exists('authIsAdmin') && authIsAdmin();
@@ -261,7 +280,7 @@ function appXtreamModal(): void
     try {
         $stats = xtreamStats();
     } catch (Throwable $e) {
-        $loadError = $e->getMessage();
+        $loadError = authHiddenError($e);
     }
     $return = basename((string) ($_SERVER['SCRIPT_NAME'] ?? 'index.php'));
     if (!in_array($return, ['index.php', 'epg.php', 'epg-mapping.php'], true)) {
@@ -757,17 +776,7 @@ function channelsForBouquet(string $ref): array
 function appBaseUrl(): string
 {
     if (!empty($_SERVER['HTTP_HOST'])) {
-        $base = requestBaseUrl();
-        $raw = loadSettingsRaw();
-        if (($raw['public_base'] ?? '') !== $base) {
-            $raw['public_base'] = $base;
-            try {
-                saveSettingsRaw($raw);
-            } catch (Throwable $e) {
-            }
-        }
-
-        return $base;
+        return requestBaseUrl();
     }
     $stored = trim((string) (loadSettingsRaw()['public_base'] ?? ''));
     if ($stored !== '') {

@@ -11,7 +11,7 @@ if (isset($_GET['suggest'])) {
         echo json_encode(['channels' => epgSearchChannels($query)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     } catch (Throwable $e) {
         http_response_code(500);
-        echo json_encode(['channels' => [], 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['channels' => [], 'error' => authHiddenError($e)], JSON_UNESCAPED_UNICODE);
     }
     exit;
 }
@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $notice = 'Channels matched again. Manual mappings were kept.';
         }
     } catch (Throwable $e) {
-        $error = $e->getMessage();
+        $error = authHiddenError($e);
     }
 }
 
@@ -57,7 +57,7 @@ $loadError = null;
 try {
     $listing = epgMappingPage($status, $query, $page);
 } catch (Throwable $e) {
-    $loadError = $e->getMessage();
+    $loadError = authHiddenError($e);
     $listing = ['rows' => [], 'total' => 0, 'page' => 1, 'pages' => 1];
 }
 

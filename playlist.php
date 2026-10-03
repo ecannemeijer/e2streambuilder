@@ -57,7 +57,7 @@ try {
 } catch (Throwable $e) {
     http_response_code(502);
     header('Content-Type: text/plain; charset=utf-8');
-    echo $e->getMessage();
+    echo authHiddenError($e);
     exit;
 }
 

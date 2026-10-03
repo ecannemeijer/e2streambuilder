@@ -29,7 +29,7 @@ try {
     $info = webifJson('/api/statusinfo');
 } catch (Throwable $e) {
     http_response_code(502);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['ok' => false, 'error' => authHiddenError($e)], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
