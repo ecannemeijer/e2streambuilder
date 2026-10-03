@@ -182,7 +182,7 @@ if ($activeHouse === '' && $homes !== []) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=18">
+    <link rel="stylesheet" href="assets/app.css?v=19">
     <?php appShellStyle(); ?>
 </head>
 <body>
@@ -257,6 +257,39 @@ if ($activeHouse === '' && $homes !== []) {
         <?php if ($account === null || $homes !== []): ?>
             <button class="btn" type="button" data-close>Close</button>
         <?php endif; ?>
+    </div>
+</div>
+<div id="remote">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="remote-title">
+        <h2 id="remote-title">Receiver is somewhere else</h2>
+        <p>Use this when the receiver is not on the same network as this server. Publish playlist is for a receiver this server can reach.</p>
+        <div class="guide-steps">
+            <article>
+                <span class="step">1</span>
+                <div>
+                    <h3>Save the bookmark</h3>
+                    <p>Drag <strong>Publish house</strong> onto the bookmarks bar. Press Ctrl+Shift+B if that bar is hidden.</p>
+                    <p><a class="btn primary" id="remote-drag" href="#">Publish house</a></p>
+                    <p>If you cannot drag it, press Copy. In Chrome press Ctrl+D, then More, replace URL with the copied text, name it Publish house, and press Done. The address starts with <code>javascript:</code>.</p>
+                    <p><button class="btn" type="button" id="remote-copy" data-copy="">Copy</button></p>
+                </div>
+            </article>
+            <article>
+                <span class="step">2</span>
+                <div>
+                    <h3>Open the receiver</h3>
+                    <p>On the receiver’s network, open its web page in this browser, for example <code>http://192.168.1.10</code>.</p>
+                </div>
+            </article>
+            <article>
+                <span class="step">3</span>
+                <div>
+                    <h3>Click the bookmark</h3>
+                    <p>Click <strong>Publish house</strong> on that page. The browser reads the channels through OpenWebIF and sends them here. A message appears when the list is stored.</p>
+                </div>
+            </article>
+        </div>
+        <button class="btn" type="button" data-close>Close</button>
     </div>
 </div>
 <div class="app homes">
@@ -354,7 +387,7 @@ if ($activeHouse === '' && $homes !== []) {
                         <input type="hidden" name="token" value="<?= h($token) ?>">
                         <button class="btn" type="submit">Publish playlist</button>
                     </form>
-                    <button class="btn" type="button" data-copy="<?= h($bookmark) ?>">Copy bookmark</button>
+                    <button class="btn" type="button" data-open="remote" data-bookmark="<?= h($bookmark) ?>">Receiver is somewhere else</button>
                     <form method="post" action="index.php" onsubmit="return confirm('Remove this house?');">
                         <?= authCsrfField() ?>
                         <input type="hidden" name="delete_home" value="1">
@@ -362,7 +395,6 @@ if ($activeHouse === '' && $homes !== []) {
                         <button class="btn" type="submit">Remove</button>
                     </form>
                 </div>
-                <p class="meta">Copy bookmark copies a browser bookmark. Create a bookmark, paste the copied text as its address, open the receiver web page, then click that bookmark. It reads the channels there and sends them to this site.</p>
             </div>
         <?php endforeach; ?>
     </div>
@@ -510,6 +542,18 @@ if ($activeHouse === '' && $homes !== []) {
     }
     show(params.get('house') || stored || pick.value);
     pick.addEventListener('change', function () { show(pick.value); });
+})();
+(function () {
+    var drag = document.getElementById('remote-drag');
+    var copy = document.getElementById('remote-copy');
+    if (drag) drag.addEventListener('click', function (event) { event.preventDefault(); });
+    document.querySelectorAll('[data-open="remote"]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var bookmark = button.getAttribute('data-bookmark') || '';
+            if (drag) drag.setAttribute('href', bookmark);
+            if (copy) copy.setAttribute('data-copy', bookmark);
+        });
+    });
 })();
 </script>
 <script src="assets/app.js?v=7"></script>

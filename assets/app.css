@@ -153,6 +153,28 @@ button { cursor: pointer; }
     margin: 0;
 }
 
+.guide-steps {
+    display: grid;
+    gap: 14px;
+    margin: 14px 0;
+}
+
+.guide-steps article {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px 12px;
+    align-items: start;
+}
+
+.guide-steps h3 {
+    margin: 0 0 4px;
+    font-size: 1rem;
+}
+
+.guide-steps p { margin: 0 0 8px; }
+.guide-steps p:last-child { margin-bottom: 0; }
+.guide-steps .btn { margin-top: 2px; }
+
 .housebar .you { margin: 0; color: var(--accent); font-weight: 650; }
 .housebar .meta { margin: 0; }
 .housebar form { margin: 0; }
@@ -266,6 +288,12 @@ h1 {
     background: var(--raise-2);
     border-radius: 8px;
     padding: 9px 12px;
+}
+
+a.btn {
+    display: inline-block;
+    text-decoration: none;
+    color: inherit;
 }
 
 .btn.primary {

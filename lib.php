@@ -49,14 +49,15 @@ function appThemeScript(): void
 function appShellStyle(): void
 {
     echo '<style>
-#loading,#help,#xtream,#receiver,#add-house,#login,#register{display:none !important}
-#loading.is-open,#help.is-open,#xtream.is-open,#receiver.is-open,#add-house.is-open,#login.is-open,#register.is-open{display:flex !important;position:fixed !important;top:0;right:0;bottom:0;left:0;z-index:4000;align-items:center;justify-content:center;margin:0;padding:24px;background:rgba(0,0,0,.55);color:#f4f7f4}
+#loading,#help,#xtream,#receiver,#add-house,#login,#register,#remote{display:none !important}
+#loading.is-open,#help.is-open,#xtream.is-open,#receiver.is-open,#add-house.is-open,#login.is-open,#register.is-open,#remote.is-open{display:flex !important;position:fixed !important;top:0;right:0;bottom:0;left:0;z-index:4000;align-items:center;justify-content:center;margin:0;padding:24px;background:rgba(0,0,0,.55);color:#f4f7f4}
 #loading.is-open{flex-direction:column;gap:14px;z-index:5000 !important}
 #loading p{max-width:36rem;margin:0;text-align:center;line-height:1.45;word-break:break-word}
 #loading .spinner{width:46px;height:46px;border:4px solid rgba(255,255,255,.28);border-top-color:#e2a85a;border-radius:50%;animation:e2spin .8s linear infinite}
-#help .dialog,#xtream .dialog,#receiver .dialog,#add-house .dialog,#login .dialog,#register .dialog{width:min(640px,100%);max-height:min(80vh,720px);overflow:auto;background:var(--raise,#181e19);color:var(--text,#e7efe6);border:1px solid var(--line,#313a32);border-radius:14px;padding:18px;box-shadow:0 18px 40px rgba(0,0,0,.35)}
-#help .dialog h2,#xtream .dialog h2,#receiver .dialog h2,#add-house .dialog h2,#login .dialog h2,#register .dialog h2{margin:0 0 8px}
-#help .dialog p,#help .dialog li,#xtream .dialog p,#xtream .dialog li,#receiver .dialog p,#add-house .dialog p,#login .dialog p,#register .dialog p{color:var(--muted,#93a196)}
+#help .dialog,#xtream .dialog,#receiver .dialog,#add-house .dialog,#login .dialog,#register .dialog,#remote .dialog{width:min(640px,100%);max-height:min(80vh,720px);overflow:auto;background:var(--raise,#181e19);color:var(--text,#e7efe6);border:1px solid var(--line,#313a32);border-radius:14px;padding:18px;box-shadow:0 18px 40px rgba(0,0,0,.35)}
+#remote .dialog{width:min(720px,100%)}
+#help .dialog h2,#xtream .dialog h2,#receiver .dialog h2,#add-house .dialog h2,#login .dialog h2,#register .dialog h2,#remote .dialog h2{margin:0 0 8px}
+#help .dialog p,#help .dialog li,#xtream .dialog p,#xtream .dialog li,#receiver .dialog p,#add-house .dialog p,#login .dialog p,#register .dialog p,#remote .dialog p,#remote .dialog li{color:var(--muted,#93a196)}
 #login .dialog p.error,#register .dialog p.error,#add-house .dialog p.error,#receiver .dialog p.error{color:#e07a68 !important;font-weight:700}
 #login .dialog .field input,#register .dialog .field input,#add-house .dialog .field input{width:100%;box-sizing:border-box}
 #help .dialog ol{margin:0 0 12px;padding-left:1.2rem}
@@ -104,6 +105,7 @@ document.addEventListener("DOMContentLoaded",function(){
     overlay.addEventListener("click",function(event){if(event.target===overlay)hide();});
     document.addEventListener("keydown",function(event){if(event.key==="Escape")hide();});
   }
+  bindOverlay("remote","remote-open");
   bindOverlay("add-house","add-house-open");
   bindOverlay("login","login-open");
   bindOverlay("register","register-open");
@@ -238,7 +240,7 @@ function appChrome(): void
         echo '<li>Create an account with your email address and log in.</li>';
         echo '<li>Add a house. The address uses the house name, for example <code>/u/kilder/channels.m3u8</code>.</li>';
         echo '<li>Enter the receiver address next to the house, press <strong>Save</strong>, then <strong>Publish playlist</strong>. OpenWebIF is used to read all the channels. That writes the personal playlist and the guide on this server, and sends both addresses to your email.</li>';
-        echo '<li>When the receiver is on another network, press <strong>Copy bookmark</strong>. Create a browser bookmark and paste the copied text as its address. Open the receiver web page, then click that bookmark. The browser reads OpenWebIF there and sends the channels to this site.</li>';
+        echo '<li>When the receiver is on another network, press <strong>Receiver is somewhere else</strong> and follow the three steps. Drag <strong>Publish house</strong> to the bookmarks bar, open the receiver web page, then click that bookmark. The browser reads OpenWebIF there and sends the channels to this site.</li>';
         echo '<li>In your IPTV player, add the channels address as a playlist. The categories follow the bouquets on the receiver. The guide address is shown next to the playlist.</li>';
         echo '<li><strong>Download e2.m3u8</strong> builds the selected bouquets and saves that copy on your computer.</li>';
         echo '</ol>';
