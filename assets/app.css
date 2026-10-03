@@ -108,6 +108,10 @@ button { cursor: pointer; }
     border-radius: 12px;
 }
 
+.housebar[hidden] {
+    display: none;
+}
+
 .house-links {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
