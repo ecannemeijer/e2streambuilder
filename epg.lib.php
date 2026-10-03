@@ -648,12 +648,13 @@ function authSendMail(string $to, string $subject, string $body): void
     if (!authEmailOk($to)) {
         throw new RuntimeException('This account has no email address.');
     }
+    $fromEmail = 'no-reply@homearchive.nl';
     $headers = implode("\r\n", [
         'MIME-Version: 1.0',
         'Content-Type: text/plain; charset=UTF-8',
-        'From: E2 Stream Builder <noreply@e2sb.duckdns.org>',
+        'From: E2 Stream Builder <' . $fromEmail . '>',
     ]);
-    $ok = mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, $headers);
+    $ok = mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, $headers, '-f ' . $fromEmail);
     if ($ok !== true) {
         throw new RuntimeException('The email could not be sent.');
     }

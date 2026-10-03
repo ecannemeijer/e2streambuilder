@@ -96,11 +96,10 @@ document.addEventListener("DOMContentLoaded",function(){
   if(xtream)xtream.addEventListener("click",function(event){if(event.target===xtream)closeXtream();});
   function bindOverlay(id, openId){
     var overlay=document.getElementById(id);
-    var open=document.getElementById(openId);
     if(!overlay)return;
     function show(){overlay.classList.add("is-open");}
     function hide(){if(overlay.classList.contains("is-required"))return;overlay.classList.remove("is-open");}
-    if(open)open.addEventListener("click",show);
+    document.querySelectorAll("#"+openId+",[data-open=\""+id+"\"]").forEach(function(open){open.addEventListener("click",show);});
     overlay.querySelectorAll("[data-close]").forEach(function(button){button.addEventListener("click",hide);});
     overlay.addEventListener("click",function(event){if(event.target===overlay)hide();});
     document.addEventListener("keydown",function(event){if(event.key==="Escape")hide();});

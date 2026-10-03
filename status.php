@@ -1,8 +1,15 @@
 <?php
 
-require_once __DIR__ . '/lib.php';
+require_once __DIR__ . '/epg.lib.php';
 
 header('Content-Type: application/json; charset=utf-8');
+
+authStart();
+if (authUser() === null) {
+    http_response_code(401);
+    echo json_encode(['ok' => false, 'error' => 'Log in to see the receiver.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
 if (isset($_GET['host'])) {
     try {

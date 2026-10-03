@@ -335,4 +335,4 @@ onlyStreams?.addEventListener('change', renderChannels);
 video?.addEventListener('playing', hidePlaceholder);
 
 refreshBouquetCount();
-loadStatus();
+if (statusEl) loadStatus();

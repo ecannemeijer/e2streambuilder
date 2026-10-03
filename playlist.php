@@ -22,6 +22,17 @@ if (requestWantsPublishedPlaylist() && !isset($_REQUEST['filter']) && is_file($p
     exit;
 }
 
+if (isset($_REQUEST['filter']) || isset($_REQUEST['download'])) {
+    require_once __DIR__ . '/epg.lib.php';
+    authStart();
+    if (authUser() === null) {
+        http_response_code(401);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo 'Log in to download a playlist.';
+        exit;
+    }
+}
+
 $type = $_REQUEST['type'] ?? 'all';
 if (!in_array($type, ['all', 'stream', 'tv'], true)) {
     $type = 'all';

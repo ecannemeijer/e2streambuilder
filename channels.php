@@ -1,8 +1,15 @@
 <?php
 
-require_once __DIR__ . '/lib.php';
+require_once __DIR__ . '/epg.lib.php';
 
 header('Content-Type: application/json; charset=utf-8');
+
+authStart();
+if (authUser() === null) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Log in to see channels.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
 $ref = $_GET['ref'] ?? '';
 if (!is_string($ref) || $ref === '' || strlen($ref) > 500) {

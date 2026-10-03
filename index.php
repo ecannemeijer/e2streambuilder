@@ -125,14 +125,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_home'])) {
     }
 }
 
-$settings = receiverSettings();
+$settings = $account === null ? null : receiverSettings();
 $error = null;
 $bouquets = [];
 
-try {
-    $bouquets = fetchBouquets();
-} catch (Throwable $e) {
-    $error = $e->getMessage();
+if ($account !== null) {
+    try {
+        $bouquets = fetchBouquets();
+    } catch (Throwable $e) {
+        $error = $e->getMessage();
+    }
 }
 
 $base = appBaseUrl();
@@ -170,11 +172,12 @@ if ($activeHouse === '' && $homes !== []) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=13">
+    <link rel="stylesheet" href="assets/app.css?v=14">
     <?php appShellStyle(); ?>
 </head>
 <body>
 <?php appChrome(); ?>
+<?php if ($account !== null && is_array($settings)): ?>
 <div id="receiver" class="<?= $formError !== null || $saved ? 'is-open' : '' ?>">
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="receiver-title">
         <h2 id="receiver-title">Receiver</h2>
@@ -207,6 +210,7 @@ if ($activeHouse === '' && $homes !== []) {
         <button class="btn" type="button" data-close>Close</button>
     </div>
 </div>
+<?php endif; ?>
 <div id="login" class="<?= $authDialog === 'login' ? 'is-open' : '' ?>">
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="login-title">
         <h2 id="login-title">Log in</h2>
@@ -308,15 +312,15 @@ if ($activeHouse === '' && $homes !== []) {
                 <button class="nav-btn" type="submit">Log out</button>
             </form>
         <?php endif; ?>
-        <button class="nav-btn" type="button" id="receiver-open">Receiver</button>
-        <div class="status" id="status"><i></i><span>Checking connection…</span></div>
+        <?php if ($account !== null): ?>
+            <button class="nav-btn" type="button" id="receiver-open">Receiver</button>
+            <div class="status" id="status"><i></i><span>Checking connection…</span></div>
+        <?php endif; ?>
     </header>
 
     <div class="housebars">
         <?php if ($authError !== null): ?>
             <p class="error"><?= h($authError) ?></p>
-        <?php elseif ($account === null): ?>
-            <p class="note">Log in to see your houses. Create an account if you do not have one.</p>
         <?php elseif ($homes === []): ?>
             <p class="note">Add a house. The menu then shows that name next to “You are”.</p>
         <?php endif; ?>
@@ -339,15 +343,17 @@ if ($activeHouse === '' && $homes !== []) {
             <div class="housebar" data-house="<?= h($token) ?>"<?= $token === $activeHouse ? '' : ' hidden' ?>>
                 <p class="you">You are <?= h((string) $house['name']) ?></p>
                 <p class="meta">Receiver <?= $house['host'] !== '' ? h((string) $house['host']) : 'not set' ?> · port <?= (int) $house['stream_port'] ?></p>
-                <div class="house-link">
-                    <span>Channels</span>
-                    <p class="url slim" title="<?= h($playlistUrl) ?>"><?= h($playlistUrl) ?></p>
-                    <button class="btn" type="button" data-copy="<?= h($playlistUrl) ?>">Copy</button>
-                </div>
-                <div class="house-link">
-                    <span>Guide</span>
-                    <p class="url slim" title="<?= h($guideUrl) ?>"><?= h($guideUrl) ?></p>
-                    <button class="btn" type="button" data-copy="<?= h($guideUrl) ?>">Copy</button>
+                <div class="house-links">
+                    <div class="house-link">
+                        <span>Channels</span>
+                        <p class="url slim" title="<?= h($playlistUrl) ?>"><?= h($playlistUrl) ?></p>
+                        <button class="btn" type="button" data-copy="<?= h($playlistUrl) ?>">Copy</button>
+                    </div>
+                    <div class="house-link">
+                        <span>Guide</span>
+                        <p class="url slim" title="<?= h($guideUrl) ?>"><?= h($guideUrl) ?></p>
+                        <button class="btn" type="button" data-copy="<?= h($guideUrl) ?>">Copy</button>
+                    </div>
                 </div>
                 <form method="post" action="index.php" class="slow">
                     <?= authCsrfField() ?>
@@ -366,6 +372,36 @@ if ($activeHouse === '' && $homes !== []) {
         <?php endforeach; ?>
     </div>
 
+    <?php if ($account === null): ?>
+    <section class="intro">
+        <div class="intro-hero">
+            <p class="eyebrow">Enigma2 voor TiviMate</p>
+            <h1>Je zenders, als afspeellijst met gids.</h1>
+            <p class="lead">E2 Stream Builder maakt van een Enigma2-ontvanger een afspeellijst voor TiviMate. Per huis krijg je een adres voor de zenders en een adres voor de programmagids. Het beeld gaat rechtstreeks naar de ontvanger.</p>
+            <div class="intro-actions">
+                <button class="btn primary" type="button" data-open="register">Account maken</button>
+                <button class="btn" type="button" data-open="login">Inloggen</button>
+            </div>
+        </div>
+        <div class="intro-grid">
+            <article>
+                <span class="step">1</span>
+                <h2>Account</h2>
+                <p>Maak een account met je e-mailadres. Daarmee log je in, en daarheen gaan de links.</p>
+            </article>
+            <article>
+                <span class="step">2</span>
+                <h2>Huis</h2>
+                <p>Voeg een huis toe, vul de ontvanger in en publiceer de lijst. Je krijgt het zenderadres en het gidsadres.</p>
+            </article>
+            <article>
+                <span class="step">3</span>
+                <h2>Kijken</h2>
+                <p>Plak het zenderadres in TiviMate. De gids hoort bij die lijst, zodat de programma’s meekomen.</p>
+            </article>
+        </div>
+    </section>
+    <?php else: ?>
     <div class="workspace<?= authIsAdmin($account) ? '' : ' two' ?>">
         <section class="panel">
             <h2>Bouquets</h2>
@@ -445,6 +481,7 @@ if ($activeHouse === '' && $homes !== []) {
         </section>
         <?php endif; ?>
     </div>
+    <?php endif; ?>
 </div>
 <script>
 (function () {
@@ -475,7 +512,7 @@ if ($activeHouse === '' && $homes !== []) {
     pick.addEventListener('change', function () { show(pick.value); });
 })();
 </script>
-<script src="assets/app.js?v=5"></script>
+<script src="assets/app.js?v=6"></script>
 <script src="assets/epg.js?v=3"></script>
 </body>
 </html>
