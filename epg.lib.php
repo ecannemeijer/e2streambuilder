@@ -416,6 +416,21 @@ function homePlaylistPath(string $token): string
     return __DIR__ . '/data/users/' . $token . '.m3u8';
 }
 
+function homePlaylistChannelCount(string $token): ?int
+{
+    $path = homePlaylistPath($token);
+    if (!is_file($path)) {
+        return null;
+    }
+    $body = file_get_contents($path);
+    if (!is_string($body) || $body === '') {
+        return 0;
+    }
+    $count = preg_match_all('/^#EXTINF:/m', $body);
+
+    return $count === false ? 0 : $count;
+}
+
 function homeEpgXmlPath(string $token): string
 {
     return __DIR__ . '/data/users/' . $token . '.epg.xml';
@@ -732,6 +747,24 @@ function authUserList(): array
     return $rows;
 }
 
+function authChangePassword(int $userId, string $current, string $next): void
+{
+    if ($userId < 1) {
+        throw new InvalidArgumentException('Log in to change your password.');
+    }
+    if (strlen($next) < 8 || strlen($next) > 200) {
+        throw new InvalidArgumentException('Use a password of at least 8 characters.');
+    }
+    $stmt = epgDb()->prepare('SELECT password_hash FROM users WHERE id = ?');
+    $stmt->execute([$userId]);
+    $hash = $stmt->fetchColumn();
+    if (!is_string($hash) || $hash === '' || !password_verify($current, $hash)) {
+        throw new InvalidArgumentException('The current password is wrong.');
+    }
+    epgDb()->prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+        ->execute([password_hash($next, PASSWORD_DEFAULT), $userId]);
+}
+
 function authUpdateUser(int $id, string $username, string $password, string $role): void
 {
     if ($id < 1) {
@@ -988,6 +1021,43 @@ function homePublishPlaylist(string $token, string $host, array $services): int
     homeMailPublished($token);
 
     return $count;
+}
+
+function homeRename(string $token, int $userId, string $name): void
+{
+    $name = trim($name);
+    if ($userId < 1 || !homeTokenOk($token)) {
+        throw new InvalidArgumentException('This house was not found.');
+    }
+    if ($name === '' || strlen($name) > 80) {
+        throw new InvalidArgumentException('Enter a house name of up to 80 characters.');
+    }
+    $stmt = epgDb()->prepare('SELECT 1 FROM homes WHERE token = ? AND user_id = ?');
+    $stmt->execute([$token, $userId]);
+    if (!$stmt->fetchColumn()) {
+        throw new InvalidArgumentException('This house was not found.');
+    }
+    epgDb()->prepare('UPDATE homes SET name = ? WHERE token = ? AND user_id = ?')
+        ->execute([$name, $token, $userId]);
+}
+
+function homeSetStreamPort(string $token, int $userId, int $streamPort): void
+{
+    if ($userId < 1 || !homeTokenOk($token)) {
+        throw new InvalidArgumentException('This house was not found.');
+    }
+    if ($streamPort < 1 || $streamPort > 65535) {
+        throw new InvalidArgumentException('The stream port must be between 1 and 65535.');
+    }
+    $stmt = epgDb()->prepare('UPDATE homes SET stream_port = ? WHERE token = ? AND user_id = ?');
+    $stmt->execute([$streamPort, $token, $userId]);
+    if ($stmt->rowCount() !== 1) {
+        $check = epgDb()->prepare('SELECT 1 FROM homes WHERE token = ? AND user_id = ?');
+        $check->execute([$token, $userId]);
+        if (!$check->fetchColumn()) {
+            throw new InvalidArgumentException('This house was not found.');
+        }
+    }
 }
 
 function homeMailPublished(string $token): bool

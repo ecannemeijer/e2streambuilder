@@ -139,6 +139,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_home'])) {
     }
 }
 
+$houseError = null;
+$houseErrorToken = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_house'])) {
+    $houseErrorToken = (string) ($_POST['token'] ?? '');
+    try {
+        authCsrfCheck();
+        if ($account === null) {
+            throw new InvalidArgumentException('Log in to change this house.');
+        }
+        homeSetStreamPort($houseErrorToken, $account['id'], (int) ($_POST['stream_port'] ?? 0));
+        homeRename($houseErrorToken, $account['id'], (string) ($_POST['house_name'] ?? ''));
+        header('Location: index.php?house=' . rawurlencode($houseErrorToken) . '&house_saved=1');
+        exit;
+    } catch (InvalidArgumentException $e) {
+        $houseError = $e->getMessage();
+    } catch (Throwable $e) {
+        $houseError = $e->getMessage();
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend_links'])) {
+    $resendToken = (string) ($_POST['token'] ?? '');
+    try {
+        authCsrfCheck();
+        if ($account === null || authIsAdmin($account)) {
+            throw new InvalidArgumentException('Log in to email these links.');
+        }
+        $owned = epgDb()->prepare('SELECT 1 FROM homes WHERE token = ? AND user_id = ?');
+        $owned->execute([$resendToken, $account['id']]);
+        if (!$owned->fetchColumn()) {
+            throw new InvalidArgumentException('This house was not found.');
+        }
+        if (!homeMailPublished($resendToken)) {
+            throw new InvalidArgumentException('The links could not be sent. This account has no email address.');
+        }
+        $_SESSION['mail_note'] = 'The links were sent to your email.';
+        header('Location: index.php?house=' . rawurlencode($resendToken));
+        exit;
+    } catch (InvalidArgumentException $e) {
+        $_SESSION['mail_note'] = $e->getMessage();
+        header('Location: index.php?house=' . rawurlencode($resendToken));
+        exit;
+    } catch (Throwable $e) {
+        $_SESSION['mail_note'] = 'The links could not be sent.';
+        header('Location: index.php?house=' . rawurlencode($resendToken));
+        exit;
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
+    try {
+        authCsrfCheck();
+        if ($account === null) {
+            throw new InvalidArgumentException('Log in to change your password.');
+        }
+        authChangePassword($account['id'], (string) ($_POST['current_password'] ?? ''), (string) ($_POST['new_password'] ?? ''));
+        header('Location: index.php?password=1');
+        exit;
+    } catch (InvalidArgumentException $e) {
+        authFail('password', $e->getMessage());
+    } catch (Throwable $e) {
+        authFail('password', $e->getMessage());
+    }
+}
+
+$houseSaved = isset($_GET['house_saved']);
+$passwordSaved = isset($_GET['password']);
+
 $isAdmin = authIsAdmin($account);
 $settings = $isAdmin ? receiverSettings() : null;
 $error = null;
@@ -187,7 +255,7 @@ if ($activeHouse === '' && $homes !== []) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=21">
+    <link rel="stylesheet" href="assets/app.css?v=22">
     <?php appShellStyle(); ?>
 </head>
 <body>
@@ -239,6 +307,31 @@ if ($activeHouse === '' && $homes !== []) {
         <button class="btn" type="button" data-close>Close</button>
     </div>
 </div>
+<?php if ($account !== null): ?>
+<div id="password" class="<?= $authDialog === 'password' ? 'is-open' : '' ?>">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="password-title">
+        <h2 id="password-title">Change password</h2>
+        <p>Use a password of at least 8 characters.</p>
+        <?php if ($authDialog === 'password' && $authError !== null): ?>
+            <p class="error"><?= h($authError) ?></p>
+        <?php endif; ?>
+        <form class="stack" method="post" action="index.php">
+            <?= authCsrfField() ?>
+            <input type="hidden" name="change_password" value="1">
+            <label class="field"><span>Current password</span>
+                <input name="current_password" type="password" maxlength="200" autocomplete="current-password" required>
+            </label>
+            <label class="field"><span>New password</span>
+                <input name="new_password" type="password" minlength="8" maxlength="200" autocomplete="new-password" required>
+            </label>
+            <div class="actions">
+                <button class="btn primary" type="submit">Save password</button>
+            </div>
+        </form>
+        <button class="btn" type="button" data-close>Close</button>
+    </div>
+</div>
+<?php endif; ?>
 <div id="add-house" class="<?= ($homeError !== null || ($account !== null && $homes === [])) ? 'is-open' : '' ?><?= ($account !== null && $homes === []) ? ' is-required' : '' ?>">
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="add-house-title">
         <h2 id="add-house-title">Add house</h2>
@@ -335,6 +428,7 @@ if ($activeHouse === '' && $homes !== []) {
                 <button class="nav-btn" type="submit">Remove house</button>
             </form>
             <?php endif; ?>
+            <button class="nav-btn" type="button" id="password-open">Password</button>
             <form method="post" action="index.php">
                 <?= authCsrfField() ?>
                 <input type="hidden" name="logout" value="1">
@@ -351,6 +445,12 @@ if ($activeHouse === '' && $homes !== []) {
         <?php endif; ?>
         <?php if ($mailNote !== null): ?>
             <p class="<?= str_contains($mailNote, 'could not') ? 'error' : 'oknote' ?>"><?= h($mailNote) ?></p>
+        <?php endif; ?>
+        <?php if ($houseSaved): ?>
+            <p class="oknote">House saved. The playlist address is unchanged. A new stream port is used the next time you publish.</p>
+        <?php endif; ?>
+        <?php if ($passwordSaved): ?>
+            <p class="oknote">Password changed.</p>
         <?php endif; ?>
         <?php if ($formError !== null): ?>
             <p class="error"><?= h($formError) ?></p>
@@ -552,12 +652,22 @@ if ($activeHouse === '' && $homes !== []) {
             $guideUrl = homeGuideUrl($slug);
             $bookmark = homeBookmarklet($token);
             $built = trim((string) ($house['built_at'] ?? ''));
+            $channelCount = homePlaylistChannelCount($token);
+            $publishedHost = trim((string) ($house['host'] ?? ''));
+            if ($channelCount === null) {
+                $publishSummary = 'Not published yet.';
+            } else {
+                $publishSummary = ($built !== '' ? 'Last published ' . $built . '. ' : 'Published. ')
+                    . (int) $channelCount . ' channels'
+                    . ($publishedHost !== '' ? ' from ' . $publishedHost : '')
+                    . '.';
+            }
             ?>
             <article class="user-house" data-house="<?= h($token) ?>"<?= $token === $activeHouse ? '' : ' hidden' ?>>
                 <header class="user-house-head">
                     <p class="eyebrow"><?= h((string) $house['name']) ?></p>
                     <h1>Your playlist</h1>
-                    <p class="note"><?= $built !== '' ? 'Last published ' . h($built) . '.' : 'Not published yet.' ?></p>
+                    <p class="note"><?= h($publishSummary) ?></p>
                 </header>
                 <div class="user-stack">
                     <section class="user-card">
@@ -567,7 +677,12 @@ if ($activeHouse === '' && $homes !== []) {
                             <div class="house-link">
                                 <span>Channels</span>
                                 <p class="url slim" title="<?= h($playlistUrl) ?>"><?= h($playlistUrl) ?></p>
-                                <button class="btn" type="button" data-copy="<?= h($playlistUrl) ?>">Copy</button>
+                                <span class="link-actions">
+                                    <button class="btn" type="button" data-copy="<?= h($playlistUrl) ?>">Copy</button>
+                                    <?php if ($channelCount !== null): ?>
+                                        <a class="btn" href="<?= h($playlistUrl) ?>" download="<?= h($slug) ?>.m3u8">Download</a>
+                                    <?php endif; ?>
+                                </span>
                             </div>
                             <div class="house-link">
                                 <span>Guide</span>
@@ -575,6 +690,31 @@ if ($activeHouse === '' && $homes !== []) {
                                 <button class="btn" type="button" data-copy="<?= h($guideUrl) ?>">Copy</button>
                             </div>
                         </div>
+                        <form method="post" action="index.php">
+                            <?= authCsrfField() ?>
+                            <input type="hidden" name="resend_links" value="1">
+                            <input type="hidden" name="token" value="<?= h($token) ?>">
+                            <button class="btn" type="submit">Email these links</button>
+                        </form>
+                    </section>
+                    <section class="user-card">
+                        <h2>This house</h2>
+                        <p>The playlist address stays the same when you rename the house. A new stream port is used the next time you publish.</p>
+                        <?php if ($houseError !== null && $houseErrorToken === $token): ?>
+                            <p class="error"><?= h($houseError) ?></p>
+                        <?php endif; ?>
+                        <form class="house-edit" method="post" action="index.php">
+                            <?= authCsrfField() ?>
+                            <input type="hidden" name="update_house" value="1">
+                            <input type="hidden" name="token" value="<?= h($token) ?>">
+                            <label class="field"><span>House name</span>
+                                <input name="house_name" maxlength="80" value="<?= h((string) $house['name']) ?>" required>
+                            </label>
+                            <label class="field port"><span>Stream port</span>
+                                <input name="stream_port" type="number" min="1" max="65535" value="<?= (int) $house['stream_port'] ?>" required>
+                            </label>
+                            <button class="btn" type="submit">Save</button>
+                        </form>
                     </section>
                     <section class="user-card">
                         <h2>Publish the channels</h2>

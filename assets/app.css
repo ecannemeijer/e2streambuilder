@@ -219,6 +219,16 @@ button { cursor: pointer; }
 .user-card > p { margin: 0 0 12px; color: var(--muted); }
 .user-card .house-links { margin-top: 4px; }
 .user-card .guide-steps { margin: 0; }
+.user-card form { margin: 12px 0 0; }
+.link-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.house-edit {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 8px 12px;
+    margin: 0;
+}
+.house-edit .field { margin: 0; }
 
 .housebar .you { margin: 0; color: var(--accent); font-weight: 650; }
 .housebar .meta { margin: 0; }
