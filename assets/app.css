@@ -72,7 +72,8 @@ button { cursor: pointer; }
 .brand.compact strong { font-size: 0.95rem; white-space: nowrap; }
 
 .menubar .nav { flex: 1; }
-.menubar > .nav-btn {
+.menubar > form { display: contents; margin: 0; }
+.menubar .nav-btn {
     color: var(--muted);
     background: var(--raise);
     border: 1px solid var(--line);

@@ -2,8 +2,12 @@
 
 require_once __DIR__ . '/epg.lib.php';
 
+authStart();
+
 $formError = null;
 $homeError = null;
+$authError = null;
+$authDialog = '';
 $saved = isset($_GET['saved']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
@@ -18,9 +22,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['logout'])) {
+    try {
+        authCsrfCheck();
+        authLogout();
+        header('Location: index.php');
+        exit;
+    } catch (InvalidArgumentException $e) {
+        $authError = $e->getMessage();
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
+    try {
+        authCsrfCheck();
+        authLogin((string) ($_POST['username'] ?? ''), (string) ($_POST['password'] ?? ''));
+        header('Location: index.php');
+        exit;
+    } catch (InvalidArgumentException $e) {
+        $authError = $e->getMessage();
+        $authDialog = 'login';
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register'])) {
+    try {
+        authCsrfCheck();
+        authRegister((string) ($_POST['username'] ?? ''), (string) ($_POST['password'] ?? ''));
+        header('Location: index.php');
+        exit;
+    } catch (InvalidArgumentException $e) {
+        $authError = $e->getMessage();
+        $authDialog = 'register';
+    }
+}
+
+$account = authUser();
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_home'])) {
     try {
-        $created = homeCreate((string) ($_POST['house_name'] ?? ''), (int) ($_POST['house_stream_port'] ?? 8001));
+        authCsrfCheck();
+        if ($account === null) {
+            throw new InvalidArgumentException('Log in to add a house.');
+        }
+        $created = homeCreate((string) ($_POST['house_name'] ?? ''), (int) ($_POST['house_stream_port'] ?? 8001), $account['id']);
         header('Location: index.php?house=' . rawurlencode((string) $created['token']));
         exit;
     } catch (InvalidArgumentException $e) {
@@ -31,9 +76,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_home'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_home'])) {
-    homeDelete((string) ($_POST['token'] ?? ''));
-    header('Location: index.php');
-    exit;
+    try {
+        authCsrfCheck();
+        if ($account !== null) {
+            homeDelete((string) ($_POST['token'] ?? ''), $account['id']);
+        }
+        header('Location: index.php');
+        exit;
+    } catch (InvalidArgumentException $e) {
+        $homeError = $e->getMessage();
+    }
 }
 
 $settings = receiverSettings();
@@ -55,7 +107,7 @@ $links = [
 $media = mediaUrls();
 $homes = [];
 try {
-    $homes = homeList();
+    $homes = $account === null ? [] : homeList($account['id']);
 } catch (Throwable $e) {
     if ($homeError === null) {
         $homeError = $e->getMessage();
@@ -81,7 +133,7 @@ if ($activeHouse === '' && $homes !== []) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=9">
+    <link rel="stylesheet" href="assets/app.css?v=10">
     <?php appShellStyle(); ?>
 </head>
 <body>
@@ -118,14 +170,61 @@ if ($activeHouse === '' && $homes !== []) {
         <button class="btn" type="button" data-close>Close</button>
     </div>
 </div>
+<div id="login" class="<?= $authDialog === 'login' ? 'is-open' : '' ?>">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="login-title">
+        <h2 id="login-title">Log in</h2>
+        <p>Your houses stay on this account. Other accounts cannot see them.</p>
+        <?php if ($authDialog === 'login' && $authError !== null): ?>
+            <p class="error"><?= h($authError) ?></p>
+        <?php endif; ?>
+        <form class="toolbar" method="post" action="index.php">
+            <?= authCsrfField() ?>
+            <input type="hidden" name="login" value="1">
+            <label class="field"><span>Username</span>
+                <input name="username" maxlength="40" autocomplete="username" required>
+            </label>
+            <label class="field"><span>Password</span>
+                <input name="password" type="password" maxlength="200" autocomplete="current-password" required>
+            </label>
+            <div class="actions">
+                <button class="btn primary" type="submit">Log in</button>
+            </div>
+        </form>
+        <button class="btn" type="button" data-close>Close</button>
+    </div>
+</div>
+<div id="register" class="<?= $authDialog === 'register' ? 'is-open' : '' ?>">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="register-title">
+        <h2 id="register-title">Create account</h2>
+        <p>Choose a username and a password of at least 8 characters.</p>
+        <?php if ($authDialog === 'register' && $authError !== null): ?>
+            <p class="error"><?= h($authError) ?></p>
+        <?php endif; ?>
+        <form class="toolbar" method="post" action="index.php">
+            <?= authCsrfField() ?>
+            <input type="hidden" name="register" value="1">
+            <label class="field"><span>Username</span>
+                <input name="username" maxlength="40" autocomplete="username" required>
+            </label>
+            <label class="field"><span>Password</span>
+                <input name="password" type="password" minlength="8" maxlength="200" autocomplete="new-password" required>
+            </label>
+            <div class="actions">
+                <button class="btn primary" type="submit">Create account</button>
+            </div>
+        </form>
+        <button class="btn" type="button" data-close>Close</button>
+    </div>
+</div>
 <div id="add-house" class="<?= $homeError !== null ? 'is-open' : '' ?>">
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="add-house-title">
         <h2 id="add-house-title">Add house</h2>
-        <p>Each house gets its own playlist. After you add it, this browser remembers that you are that house.</p>
+        <p>This house is saved on your account. Only you see its playlist address.</p>
         <?php if ($homeError !== null): ?>
             <p class="error"><?= h($homeError) ?></p>
         <?php endif; ?>
         <form class="toolbar" method="post" action="index.php">
+            <?= authCsrfField() ?>
             <input type="hidden" name="create_home" value="1">
             <label class="field"><span>House name</span>
                 <input name="house_name" maxlength="80" required>
@@ -147,24 +246,36 @@ if ($activeHouse === '' && $homes !== []) {
             <strong>E2 Stream Builder</strong>
         </a>
         <?php appNav('playlist'); ?>
-        <label class="house-switch">
-            <span>You are</span>
-            <select id="house-pick">
-                <?php if ($homes === []): ?>
-                    <option value="">No house</option>
-                <?php endif; ?>
-                <?php foreach ($homes as $house): ?>
-                    <option value="<?= h((string) $house['token']) ?>"<?= (string) $house['token'] === $activeHouse ? ' selected' : '' ?>><?= h((string) $house['name']) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </label>
-        <button class="nav-btn" type="button" id="add-house-open">Add house</button>
+        <?php if ($account === null): ?>
+            <button class="nav-btn" type="button" id="login-open">Log in</button>
+            <button class="nav-btn" type="button" id="register-open">Create account</button>
+        <?php else: ?>
+            <label class="house-switch">
+                <span>You are</span>
+                <select id="house-pick">
+                    <?php if ($homes === []): ?>
+                        <option value="">No house</option>
+                    <?php endif; ?>
+                    <?php foreach ($homes as $house): ?>
+                        <option value="<?= h((string) $house['token']) ?>"<?= (string) $house['token'] === $activeHouse ? ' selected' : '' ?>><?= h((string) $house['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <button class="nav-btn" type="button" id="add-house-open">Add house</button>
+            <form method="post" action="index.php">
+                <?= authCsrfField() ?>
+                <input type="hidden" name="logout" value="1">
+                <button class="nav-btn" type="submit">Log out</button>
+            </form>
+        <?php endif; ?>
         <button class="nav-btn" type="button" id="receiver-open">Receiver</button>
         <div class="status" id="status"><i></i><span>Checking connection…</span></div>
     </header>
 
     <div class="housebars">
-        <?php if ($homes === []): ?>
+        <?php if ($account === null): ?>
+            <p class="note">Log in to see your houses. Create an account if you do not have one.</p>
+        <?php elseif ($homes === []): ?>
             <p class="note">Add a house. The menu then shows that name next to “You are”.</p>
         <?php endif; ?>
         <?php foreach ($homes as $house): ?>
@@ -182,6 +293,7 @@ if ($activeHouse === '' && $homes !== []) {
                 <a class="btn" href="<?= h($bookmark) ?>">Publish playlist</a>
                 <button class="btn" type="button" data-copy="<?= h($bookmark) ?>">Copy bookmark</button>
                 <form method="post" action="index.php" onsubmit="return confirm('Remove this house?');">
+                    <?= authCsrfField() ?>
                     <input type="hidden" name="delete_home" value="1">
                     <input type="hidden" name="token" value="<?= h($token) ?>">
                     <button class="btn" type="submit">Remove</button>

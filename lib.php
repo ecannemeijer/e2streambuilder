@@ -43,14 +43,14 @@ function appThemeScript(): void
 function appShellStyle(): void
 {
     echo '<style>
-#loading,#help,#xtream,#receiver,#add-house{display:none !important}
-#loading.is-open,#help.is-open,#xtream.is-open,#receiver.is-open,#add-house.is-open{display:flex !important;position:fixed !important;top:0;right:0;bottom:0;left:0;z-index:4000;align-items:center;justify-content:center;margin:0;padding:24px;background:rgba(0,0,0,.55);color:#f4f7f4}
+#loading,#help,#xtream,#receiver,#add-house,#login,#register{display:none !important}
+#loading.is-open,#help.is-open,#xtream.is-open,#receiver.is-open,#add-house.is-open,#login.is-open,#register.is-open{display:flex !important;position:fixed !important;top:0;right:0;bottom:0;left:0;z-index:4000;align-items:center;justify-content:center;margin:0;padding:24px;background:rgba(0,0,0,.55);color:#f4f7f4}
 #loading.is-open{flex-direction:column;gap:14px;z-index:5000 !important}
 #loading p{max-width:36rem;margin:0;text-align:center;line-height:1.45;word-break:break-word}
 #loading .spinner{width:46px;height:46px;border:4px solid rgba(255,255,255,.28);border-top-color:#e2a85a;border-radius:50%;animation:e2spin .8s linear infinite}
-#help .dialog,#xtream .dialog,#receiver .dialog,#add-house .dialog{width:min(640px,100%);max-height:min(80vh,720px);overflow:auto;background:var(--raise,#181e19);color:var(--text,#e7efe6);border:1px solid var(--line,#313a32);border-radius:14px;padding:18px;box-shadow:0 18px 40px rgba(0,0,0,.35)}
-#help .dialog h2,#xtream .dialog h2,#receiver .dialog h2,#add-house .dialog h2{margin:0 0 8px}
-#help .dialog p,#help .dialog li,#xtream .dialog p,#xtream .dialog li,#receiver .dialog p,#add-house .dialog p{color:var(--muted,#93a196)}
+#help .dialog,#xtream .dialog,#receiver .dialog,#add-house .dialog,#login .dialog,#register .dialog{width:min(640px,100%);max-height:min(80vh,720px);overflow:auto;background:var(--raise,#181e19);color:var(--text,#e7efe6);border:1px solid var(--line,#313a32);border-radius:14px;padding:18px;box-shadow:0 18px 40px rgba(0,0,0,.35)}
+#help .dialog h2,#xtream .dialog h2,#receiver .dialog h2,#add-house .dialog h2,#login .dialog h2,#register .dialog h2{margin:0 0 8px}
+#help .dialog p,#help .dialog li,#xtream .dialog p,#xtream .dialog li,#receiver .dialog p,#add-house .dialog p,#login .dialog p,#register .dialog p{color:var(--muted,#93a196)}
 #help .dialog ol{margin:0 0 12px;padding-left:1.2rem}
 @keyframes e2spin{to{transform:rotate(360deg)}}
 html[data-theme="light"]{color-scheme:light;--bg:#f4f1ea !important;--raise:#fffdf8 !important;--raise-2:#efe8dc !important;--line:#d7cec0 !important;--text:#241c14 !important;--muted:#6d645b !important;--accent:#b86a1d !important;--accent-ink:#fff8ef !important;--accent-line:#8d4e12 !important;--good:#2f7d46 !important;--warn:#a15c12 !important;--bad:#b42318 !important;--sat:#3d5a73 !important;--stage:#1c1916 !important;--shadow:0 18px 40px rgba(70,48,20,.12) !important}
@@ -99,6 +99,8 @@ document.addEventListener("DOMContentLoaded",function(){
   }
   bindOverlay("receiver","receiver-open");
   bindOverlay("add-house","add-house-open");
+  bindOverlay("login","login-open");
+  bindOverlay("register","register-open");
   document.addEventListener("keydown",function(event){if(event.key==="Escape"){closeHelp();closeXtream();}});
   if(/[?&]xtream=1(?:&|$)/.test(location.search))openXtream();
   function showLoading(text){

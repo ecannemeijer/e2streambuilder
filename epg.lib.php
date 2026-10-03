@@ -285,6 +285,26 @@ function epgMigrate(PDO $db): void
         )');
         $db->exec('INSERT INTO epg_schema (version) VALUES (4)');
     }
+    if ($version < 5) {
+        $db->exec('CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY,
+            username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            password_hash TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )');
+        $hasUser = false;
+        foreach ($db->query('PRAGMA table_info(homes)') as $info) {
+            if ((string) $info['name'] === 'user_id') {
+                $hasUser = true;
+                break;
+            }
+        }
+        if (!$hasUser) {
+            $db->exec('ALTER TABLE homes ADD COLUMN user_id INTEGER');
+        }
+        $db->exec('CREATE INDEX IF NOT EXISTS homes_user ON homes(user_id)');
+        $db->exec('INSERT INTO epg_schema (version) VALUES (5)');
+    }
     epgSeedSources();
 }
 
@@ -325,9 +345,12 @@ function homePlaylistPath(string $token): string
     return __DIR__ . '/data/users/' . $token . '.m3u8';
 }
 
-function homeCreate(string $name, int $streamPort): array
+function homeCreate(string $name, int $streamPort, int $userId): array
 {
     $name = trim($name);
+    if ($userId < 1) {
+        throw new InvalidArgumentException('Log in to add a house.');
+    }
     if ($name === '' || strlen($name) > 80) {
         throw new InvalidArgumentException('Enter a house name of up to 80 characters.');
     }
@@ -336,8 +359,8 @@ function homeCreate(string $name, int $streamPort): array
     }
     $token = bin2hex(random_bytes(16));
     $now = epgNow();
-    epgDb()->prepare('INSERT INTO homes (token, name, stream_port, host, created_at) VALUES (?, ?, ?, \'\', ?)')
-        ->execute([$token, $name, $streamPort, $now]);
+    epgDb()->prepare('INSERT INTO homes (token, name, stream_port, host, created_at, user_id) VALUES (?, ?, ?, \'\', ?, ?)')
+        ->execute([$token, $name, $streamPort, $now, $userId]);
     $home = homeByToken($token);
     if ($home === null) {
         throw new RuntimeException('The house could not be saved.');
@@ -346,12 +369,16 @@ function homeCreate(string $name, int $streamPort): array
     return $home;
 }
 
-function homeDelete(string $token): void
+function homeDelete(string $token, int $userId): void
 {
-    if (!homeTokenOk($token)) {
+    if (!homeTokenOk($token) || $userId < 1) {
         return;
     }
-    epgDb()->prepare('DELETE FROM homes WHERE token = ?')->execute([$token]);
+    $stmt = epgDb()->prepare('DELETE FROM homes WHERE token = ? AND user_id = ?');
+    $stmt->execute([$token, $userId]);
+    if ($stmt->rowCount() !== 1) {
+        return;
+    }
     $path = homePlaylistPath($token);
     if (is_file($path)) {
         @unlink($path);
@@ -371,14 +398,179 @@ function homeByToken(string $token): ?array
 }
 
 /** @return list<array<string, mixed>> */
-function homeList(): array
+function homeList(int $userId): array
 {
+    if ($userId < 1) {
+        return [];
+    }
+    $stmt = epgDb()->prepare('SELECT token, name, stream_port, host, created_at, built_at FROM homes WHERE user_id = ? ORDER BY created_at ASC, name ASC');
+    $stmt->execute([$userId]);
     $rows = [];
-    foreach (epgDb()->query('SELECT token, name, stream_port, host, created_at, built_at FROM homes ORDER BY created_at ASC, name ASC') as $row) {
+    foreach ($stmt as $row) {
         $rows[] = $row;
     }
 
     return $rows;
+}
+
+function authStart(): void
+{
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        return;
+    }
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
+    $path = str_replace('\\', '/', dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '')));
+    $path = rtrim($path, '/');
+    if ($path === '' || $path === '.' || $path === '/') {
+        $path = '/';
+    }
+    session_name('e2sb');
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => $path,
+        'secure' => $https,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+    session_start();
+}
+
+function authCsrf(): string
+{
+    authStart();
+    $token = $_SESSION['csrf'] ?? '';
+    if (!is_string($token) || strlen($token) < 16) {
+        $token = bin2hex(random_bytes(16));
+        $_SESSION['csrf'] = $token;
+    }
+
+    return $token;
+}
+
+function authCsrfField(): string
+{
+    return '<input type="hidden" name="csrf" value="' . h(authCsrf()) . '">';
+}
+
+function authCsrfCheck(): void
+{
+    authStart();
+    $sent = (string) ($_POST['csrf'] ?? '');
+    $have = (string) ($_SESSION['csrf'] ?? '');
+    if ($have === '' || !hash_equals($have, $sent)) {
+        throw new InvalidArgumentException('The form expired. Reload the page and try again.');
+    }
+}
+
+function authUsernameOk(string $name): bool
+{
+    return preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._-]{1,39}$/', $name) === 1;
+}
+
+/** @return array{id: int, username: string}|null */
+function authUser(): ?array
+{
+    authStart();
+    $id = (int) ($_SESSION['user_id'] ?? 0);
+    if ($id < 1) {
+        return null;
+    }
+    $stmt = epgDb()->prepare('SELECT id, username FROM users WHERE id = ?');
+    $stmt->execute([$id]);
+    $row = $stmt->fetch();
+    if (!is_array($row)) {
+        unset($_SESSION['user_id']);
+
+        return null;
+    }
+
+    return ['id' => (int) $row['id'], 'username' => (string) $row['username']];
+}
+
+function authRemember(int $userId): void
+{
+    authStart();
+    session_regenerate_id(true);
+    $_SESSION['user_id'] = $userId;
+    $_SESSION['csrf'] = bin2hex(random_bytes(16));
+}
+
+function authRegister(string $username, string $password): array
+{
+    $username = trim($username);
+    if (!authUsernameOk($username)) {
+        throw new InvalidArgumentException('Use a username of 2 to 40 letters, numbers, spaces, dots, hyphens or underscores.');
+    }
+    if (strlen($password) < 8 || strlen($password) > 200) {
+        throw new InvalidArgumentException('Use a password of at least 8 characters.');
+    }
+    $db = epgDb();
+    $db->beginTransaction();
+    try {
+        $count = (int) $db->query('SELECT COUNT(*) FROM users')->fetchColumn();
+        $db->prepare('INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)')
+            ->execute([$username, password_hash($password, PASSWORD_DEFAULT), epgNow()]);
+        $id = (int) $db->lastInsertId();
+        if ($id < 1) {
+            throw new RuntimeException('The account could not be saved.');
+        }
+        if ($count === 0) {
+            $db->prepare('UPDATE homes SET user_id = ? WHERE user_id IS NULL')->execute([$id]);
+        }
+        $db->commit();
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        if ($e instanceof PDOException && str_contains($e->getMessage(), 'UNIQUE')) {
+            throw new InvalidArgumentException('That username is already in use.');
+        }
+        throw $e;
+    }
+    authRemember($id);
+    $user = authUser();
+    if ($user === null) {
+        throw new RuntimeException('The account could not be saved.');
+    }
+
+    return $user;
+}
+
+function authLogin(string $username, string $password): array
+{
+    $username = trim($username);
+    $stmt = epgDb()->prepare('SELECT id, password_hash FROM users WHERE username = ? COLLATE NOCASE');
+    $stmt->execute([$username]);
+    $row = $stmt->fetch();
+    $hash = is_array($row) ? (string) $row['password_hash'] : '';
+    if ($hash === '' || !password_verify($password, $hash)) {
+        throw new InvalidArgumentException('The username or password is wrong.');
+    }
+    authRemember((int) $row['id']);
+    $user = authUser();
+    if ($user === null) {
+        throw new RuntimeException('The account could not be opened.');
+    }
+
+    return $user;
+}
+
+function authLogout(): void
+{
+    authStart();
+    $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', [
+            'expires' => time() - 42000,
+            'path' => (string) $params['path'],
+            'secure' => (bool) $params['secure'],
+            'httponly' => (bool) $params['httponly'],
+            'samesite' => 'Lax',
+        ]);
+    }
+    session_destroy();
 }
 
 function homeMarkBuilt(string $token, string $host): void
