@@ -638,7 +638,7 @@ body.scroll .panel.stack { display: block; overflow: visible; margin-top: 14px; 
 
 .intro-hero .lead {
     margin: 0;
-    max-width: 40rem;
+    max-width: 46rem;
     color: var(--muted);
     font-size: 1.05rem;
 }
@@ -652,7 +652,7 @@ body.scroll .panel.stack { display: block; overflow: visible; margin-top: 14px; 
 
 .intro-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
 }
 

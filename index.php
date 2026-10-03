@@ -182,7 +182,7 @@ if ($activeHouse === '' && $homes !== []) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=16">
+    <link rel="stylesheet" href="assets/app.css?v=17">
     <?php appShellStyle(); ?>
 </head>
 <body>
@@ -367,9 +367,9 @@ if ($activeHouse === '' && $homes !== []) {
     <?php if ($account === null): ?>
     <section class="intro">
         <div class="intro-hero">
-            <p class="eyebrow">Enigma2 for TiviMate</p>
-            <h1>Your channels, as a playlist with a guide.</h1>
-            <p class="lead">E2 Stream Builder turns an Enigma2 receiver into a playlist for TiviMate. Each house gets an address for the channels and an address for the programme guide. Playback goes straight to the receiver.</p>
+            <p class="eyebrow">Enigma2 for IPTV</p>
+            <h1>Your channels, ready for an IPTV player.</h1>
+            <p class="lead">E2 Stream Builder reads the bouquets and channels on an Enigma2 receiver and turns them into IPTV categories. For each house it places a personal channels.m3u8 on this server, ready to open in an IPTV player. Playback goes straight to the receiver, with a programme guide for the same list.</p>
             <div class="intro-actions">
                 <button class="btn primary" type="button" data-open="register">Create account</button>
                 <button class="btn" type="button" data-open="login">Log in</button>
@@ -383,13 +383,18 @@ if ($activeHouse === '' && $homes !== []) {
             </article>
             <article>
                 <span class="step">2</span>
-                <h2>House</h2>
-                <p>Add a house, enter the receiver, and publish the list. You get the channel address and the guide address.</p>
+                <h2>Categories</h2>
+                <p>Each bouquet becomes an IPTV category. The channels in that bouquet stay together, in the same order as on the receiver.</p>
             </article>
             <article>
                 <span class="step">3</span>
+                <h2>Your file</h2>
+                <p>Publish playlist writes a personal channels.m3u8 on this server and keeps it with your house. The guide is stored beside it.</p>
+            </article>
+            <article>
+                <span class="step">4</span>
                 <h2>Watch</h2>
-                <p>Paste the channel address into TiviMate. The guide belongs to that list, so the programmes come with it.</p>
+                <p>Paste the channel address into an IPTV player. The categories and the programme guide come with that playlist.</p>
             </article>
         </div>
     </section>
