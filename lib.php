@@ -104,7 +104,6 @@ document.addEventListener("DOMContentLoaded",function(){
     overlay.addEventListener("click",function(event){if(event.target===overlay)hide();});
     document.addEventListener("keydown",function(event){if(event.key==="Escape")hide();});
   }
-  bindOverlay("receiver","receiver-open");
   bindOverlay("add-house","add-house-open");
   bindOverlay("login","login-open");
   bindOverlay("register","register-open");
@@ -235,7 +234,7 @@ function appChrome(): void
         echo '<p>Each house has its own playlist. Other accounts do not see your houses.</p>';
         echo '<ol>';
         echo '<li>Log in and add a house. The address uses the house name, for example <code>/u/kilder/channels.m3u8</code>.</li>';
-        echo '<li>Open <strong>Receiver</strong>, save the receiver address, then press <strong>Publish playlist</strong>. That stores the channel list and the guide for the house, and sends both addresses to your email.</li>';
+        echo '<li>Enter the receiver address next to the house, press <strong>Save</strong>, then <strong>Publish playlist</strong>. That stores the channel list and the guide, and sends both addresses to your email.</li>';
         echo '<li>In TiviMate, add the channels address as a playlist. The guide address is shown next to it.</li>';
         echo '<li><strong>Download e2.m3u8</strong> builds the selected bouquets and saves the file on your computer. It is not stored on this server.</li>';
         echo '</ol>';

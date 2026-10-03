@@ -12,8 +12,18 @@ $saved = isset($_GET['saved']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     try {
-        saveReceiverSettings($_POST);
-        header('Location: index.php?saved=1');
+        $savedSettings = saveReceiverSettings($_POST);
+        $actor = authUser();
+        $savedToken = (string) ($_POST['token'] ?? '');
+        if ($actor !== null && homeTokenOk($savedToken)) {
+            epgDb()->prepare('UPDATE homes SET host = ?, stream_port = ? WHERE token = ? AND user_id = ?')
+                ->execute([$savedSettings['host'], $savedSettings['stream_port'], $savedToken, $actor['id']]);
+        }
+        $back = 'index.php?saved=1';
+        if (homeTokenOk($savedToken)) {
+            $back .= '&house=' . rawurlencode($savedToken);
+        }
+        header('Location: ' . $back);
         exit;
     } catch (InvalidArgumentException $e) {
         $formError = $e->getMessage();
@@ -172,45 +182,11 @@ if ($activeHouse === '' && $homes !== []) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=15">
+    <link rel="stylesheet" href="assets/app.css?v=16">
     <?php appShellStyle(); ?>
 </head>
 <body>
 <?php appChrome(); ?>
-<?php if ($account !== null && is_array($settings)): ?>
-<div id="receiver" class="<?= $formError !== null || $saved ? 'is-open' : '' ?>">
-    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="receiver-title">
-        <h2 id="receiver-title">Receiver</h2>
-        <p>The fixed playlists on this server use this address.</p>
-        <form class="toolbar" method="post" action="index.php">
-            <input type="hidden" name="save_settings" value="1">
-            <label class="field"><span>IP address</span>
-                <input name="host" value="<?= h($settings['host']) ?>" inputmode="decimal" autocomplete="off" required>
-            </label>
-            <label class="field port"><span>WebIF port</span>
-                <input name="webif_port" type="number" min="1" max="65535" value="<?= (int) $settings['webif_port'] ?>" required>
-            </label>
-            <label class="field port"><span>Stream port</span>
-                <input name="stream_port" type="number" min="1" max="65535" value="<?= (int) $settings['stream_port'] ?>" required>
-            </label>
-            <div class="actions">
-                <button class="btn primary" type="submit">Save</button>
-                <button class="btn" type="button" id="test">Test connection</button>
-            </div>
-            <p class="<?= $formError !== null ? 'error' : ($saved ? 'oknote' : 'note') ?>" id="test-result">
-                <?php if ($formError !== null): ?>
-                    <?= h($formError) ?>
-                <?php elseif ($saved): ?>
-                    Settings saved.
-                <?php else: ?>
-                    Save, then test the connection.
-                <?php endif; ?>
-            </p>
-        </form>
-        <button class="btn" type="button" data-close>Close</button>
-    </div>
-</div>
-<?php endif; ?>
 <div id="login" class="<?= $authDialog === 'login' ? 'is-open' : '' ?>">
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="login-title">
         <h2 id="login-title">Log in</h2>
@@ -312,10 +288,6 @@ if ($activeHouse === '' && $homes !== []) {
                 <button class="nav-btn" type="submit">Log out</button>
             </form>
         <?php endif; ?>
-        <?php if ($account !== null): ?>
-            <button class="nav-btn" type="button" id="receiver-open">Receiver</button>
-            <div class="status" id="status"><i></i><span>Checking connection…</span></div>
-        <?php endif; ?>
     </header>
 
     <div class="housebars">
@@ -326,6 +298,11 @@ if ($activeHouse === '' && $homes !== []) {
         <?php endif; ?>
         <?php if ($mailNote !== null): ?>
             <p class="<?= str_contains($mailNote, 'could not') ? 'error' : 'oknote' ?>"><?= h($mailNote) ?></p>
+        <?php endif; ?>
+        <?php if ($formError !== null): ?>
+            <p class="error"><?= h($formError) ?></p>
+        <?php elseif ($saved): ?>
+            <p class="oknote">Receiver saved.</p>
         <?php endif; ?>
         <?php if ($publishError !== null): ?>
             <p class="error"><?= h($publishError) ?></p>
@@ -338,11 +315,10 @@ if ($activeHouse === '' && $homes !== []) {
             $slug = (string) $house['slug'];
             $playlistUrl = homeChannelsUrl($slug);
             $guideUrl = homeGuideUrl($slug);
-            $bookmark = homeBookmarklet($token);
+            $receiverHost = (string) $house['host'] !== '' ? (string) $house['host'] : (string) $settings['host'];
             ?>
             <div class="housebar" data-house="<?= h($token) ?>"<?= $token === $activeHouse ? '' : ' hidden' ?>>
                 <p class="you">You are <?= h((string) $house['name']) ?></p>
-                <p class="meta">Receiver <?= $house['host'] !== '' ? h((string) $house['host']) : 'not set' ?> · port <?= (int) $house['stream_port'] ?></p>
                 <div class="house-links">
                     <div class="house-link">
                         <span>Channels</span>
@@ -355,20 +331,35 @@ if ($activeHouse === '' && $homes !== []) {
                         <button class="btn" type="button" data-copy="<?= h($guideUrl) ?>">Copy</button>
                     </div>
                 </div>
-                <form method="post" action="index.php" class="slow">
-                    <?= authCsrfField() ?>
-                    <input type="hidden" name="publish_home" value="1">
-                    <input type="hidden" name="token" value="<?= h($token) ?>">
-                    <button class="btn" type="submit">Publish playlist</button>
-                </form>
-                <button class="btn" type="button" data-copy="<?= h($bookmark) ?>" title="Copies a browser bookmark. Open the receiver web page, then click that bookmark.">Copy bookmark</button>
-                <p class="meta">Copy bookmark is for the receiver web page. Publish playlist reads the receiver from here.</p>
-                <form method="post" action="index.php" onsubmit="return confirm('Remove this house?');">
-                    <?= authCsrfField() ?>
-                    <input type="hidden" name="delete_home" value="1">
-                    <input type="hidden" name="token" value="<?= h($token) ?>">
-                    <button class="btn" type="submit">Remove</button>
-                </form>
+                <div class="house-actions">
+                    <form class="receiver-inline" method="post" action="index.php">
+                        <input type="hidden" name="save_settings" value="1">
+                        <input type="hidden" name="token" value="<?= h($token) ?>">
+                        <label class="field"><span>Receiver</span>
+                            <input name="host" value="<?= h($receiverHost) ?>" inputmode="decimal" autocomplete="off" required>
+                        </label>
+                        <label class="field port"><span>WebIF</span>
+                            <input name="webif_port" type="number" min="1" max="65535" value="<?= (int) $settings['webif_port'] ?>" required>
+                        </label>
+                        <label class="field port"><span>Stream</span>
+                            <input name="stream_port" type="number" min="1" max="65535" value="<?= (int) $house['stream_port'] ?>" required>
+                        </label>
+                        <button class="btn" type="submit">Save</button>
+                    </form>
+                    <div class="status"><i></i><span>Checking connection…</span></div>
+                    <form method="post" action="index.php" class="slow">
+                        <?= authCsrfField() ?>
+                        <input type="hidden" name="publish_home" value="1">
+                        <input type="hidden" name="token" value="<?= h($token) ?>">
+                        <button class="btn" type="submit">Publish playlist</button>
+                    </form>
+                    <form method="post" action="index.php" onsubmit="return confirm('Remove this house?');">
+                        <?= authCsrfField() ?>
+                        <input type="hidden" name="delete_home" value="1">
+                        <input type="hidden" name="token" value="<?= h($token) ?>">
+                        <button class="btn" type="submit">Remove</button>
+                    </form>
+                </div>
             </div>
         <?php endforeach; ?>
     </div>
@@ -513,7 +504,7 @@ if ($activeHouse === '' && $homes !== []) {
     pick.addEventListener('change', function () { show(pick.value); });
 })();
 </script>
-<script src="assets/app.js?v=6"></script>
+<script src="assets/app.js?v=7"></script>
 <script src="assets/epg.js?v=3"></script>
 </body>
 </html>

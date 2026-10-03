@@ -134,6 +134,21 @@ button { cursor: pointer; }
     word-break: break-all;
 }
 
+.house-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 8px 12px;
+}
+
+.receiver-inline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 8px;
+    margin: 0;
+}
+
 .housebar .you { margin: 0; color: var(--accent); font-weight: 650; }
 .housebar .meta { margin: 0; }
 .housebar form { margin: 0; }

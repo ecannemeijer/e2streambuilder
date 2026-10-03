@@ -1,4 +1,4 @@
-const statusEl = document.getElementById('status');
+const statusNodes = Array.from(document.querySelectorAll('.housebar .status'));
 const testButton = document.getElementById('test');
 const testResult = document.getElementById('test-result');
 const video = document.getElementById('screen');
@@ -20,9 +20,11 @@ let hls = null;
 let tsPlayer = null;
 
 function setStatus(kind, text) {
-    if (!statusEl) return;
-    statusEl.className = 'status ' + (kind || '');
-    statusEl.querySelector('span').textContent = text;
+    statusNodes.forEach((el) => {
+        el.className = 'status ' + (kind || '');
+        const label = el.querySelector('span');
+        if (label) label.textContent = text;
+    });
 }
 
 function setTestResult(kind, text) {
@@ -32,10 +34,11 @@ function setTestResult(kind, text) {
 }
 
 function receiverFields() {
+    const root = document.querySelector('.housebar:not([hidden])') || document;
     return {
-        host: document.querySelector('[name="host"]')?.value.trim() || '',
-        webif: document.querySelector('[name="webif_port"]')?.value || '80',
-        stream: document.querySelector('[name="stream_port"]')?.value || '8001',
+        host: root.querySelector('[name="host"]')?.value.trim() || '',
+        webif: root.querySelector('[name="webif_port"]')?.value || '80',
+        stream: root.querySelector('[name="stream_port"]')?.value || '8001',
     };
 }
 
@@ -335,4 +338,5 @@ onlyStreams?.addEventListener('change', renderChannels);
 video?.addEventListener('playing', hidePlaceholder);
 
 refreshBouquetCount();
-if (statusEl) loadStatus();
+if (statusNodes.length) loadStatus();
+document.getElementById('house-pick')?.addEventListener('change', () => loadStatus());
