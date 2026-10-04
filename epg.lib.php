@@ -665,31 +665,65 @@ function playlistExtinfTitle(string $line): string
     return '';
 }
 
-/**
- * @param list<int> $keep
- */
-function homeSavePlaylistSelection(string $token, int $userId, array $keep): void
+function playlistRewriteExtinf(string $line, string $name, string $group): string
 {
-    if (homeForEditor($token, $userId) === null) {
-        throw new InvalidArgumentException('This house was not found.');
+    $name = m3uText($name);
+    $group = m3uText($group);
+    if ($name === '') {
+        $name = 'Channel';
     }
-    $path = homePlaylistPath($token);
-    $body = is_file($path) ? file_get_contents($path) : false;
-    if (!is_string($body) || $body === '') {
-        throw new InvalidArgumentException('This house has no playlist yet.');
+    if ($group === '') {
+        $group = 'Channels';
     }
-    $wanted = [];
-    foreach ($keep as $index) {
-        if (is_int($index) || (is_string($index) && preg_match('/^\d+$/', $index) === 1)) {
-            $wanted[(int) $index] = true;
+    if (preg_match('/\btvg-name="[^"]*"/', $line) === 1) {
+        $line = (string) preg_replace('/\btvg-name="[^"]*"/', 'tvg-name="' . $name . '"', $line, 1);
+    }
+    if (preg_match('/\bgroup-title="[^"]*"/', $line) === 1) {
+        $line = (string) preg_replace('/\bgroup-title="[^"]*"/', 'group-title="' . $group . '"', $line, 1);
+    }
+    $quoted = false;
+    $comma = -1;
+    $length = strlen($line);
+    for ($i = 0; $i < $length; $i++) {
+        $char = $line[$i];
+        if ($char === '"') {
+            $quoted = !$quoted;
+            continue;
+        }
+        if ($char === ',' && !$quoted) {
+            $comma = $i;
         }
     }
+    $attrs = '';
+    if (preg_match('/\btvg-name="/', $line) !== 1) {
+        $attrs .= ' tvg-name="' . $name . '"';
+    }
+    if (preg_match('/\bgroup-title="/', $line) !== 1) {
+        $attrs .= ' group-title="' . $group . '"';
+    }
+    if ($comma >= 0) {
+        if ($attrs !== '') {
+            $line = substr($line, 0, $comma) . $attrs . substr($line, $comma);
+            $comma += strlen($attrs);
+        }
+
+        return substr($line, 0, $comma + 1) . $name;
+    }
+
+    return $line . $attrs . ',' . $name;
+}
+
+/**
+ * @param list<array<string, mixed>> $layout
+ */
+function playlistApplyLayout(string $body, array $layout): string
+{
     $lines = preg_split("/\r\n|\n|\r/", $body);
     if ($lines === false) {
         throw new InvalidArgumentException('This house has no playlist yet.');
     }
     $header = [];
-    $kept = [];
+    $entries = [];
     $index = 0;
     $seen = false;
     $count = count($lines);
@@ -714,20 +748,86 @@ function homeSavePlaylistSelection(string $token, int $userId, array $keep): voi
         if ($url === '') {
             continue;
         }
-        if (isset($wanted[$index])) {
-            $kept[] = $line . "\n" . $url . "\n";
-        }
+        $entries[$index] = ['line' => $line, 'url' => $url];
         $index++;
+    }
+    $used = [];
+    $kept = [];
+    $groupNames = [];
+    foreach ($layout as $group) {
+        if (!is_array($group)) {
+            continue;
+        }
+        $groupName = m3uText((string) ($group['name'] ?? ''));
+        if ($groupName === '') {
+            $groupName = 'Channels';
+        }
+        if (strlen($groupName) > 80) {
+            throw new InvalidArgumentException('A category name is too long.');
+        }
+        $key = strtolower($groupName);
+        if (isset($groupNames[$key])) {
+            throw new InvalidArgumentException('Each category needs its own name.');
+        }
+        $channels = $group['channels'] ?? null;
+        if (!is_array($channels)) {
+            continue;
+        }
+        $wrote = false;
+        foreach ($channels as $channel) {
+            if (!is_array($channel)) {
+                continue;
+            }
+            $channelIndex = $channel['index'] ?? null;
+            if (!is_int($channelIndex) && !(is_string($channelIndex) && preg_match('/^\d+$/', $channelIndex) === 1)) {
+                continue;
+            }
+            $channelIndex = (int) $channelIndex;
+            if (isset($used[$channelIndex]) || !isset($entries[$channelIndex])) {
+                continue;
+            }
+            $name = m3uText((string) ($channel['name'] ?? ''));
+            if ($name === '') {
+                $name = 'Channel';
+            }
+            if (strlen($name) > 120) {
+                throw new InvalidArgumentException('A channel name is too long.');
+            }
+            $used[$channelIndex] = true;
+            $kept[] = playlistRewriteExtinf($entries[$channelIndex]['line'], $name, $groupName) . "\n" . $entries[$channelIndex]['url'] . "\n";
+            $wrote = true;
+        }
+        if ($wrote) {
+            $groupNames[$key] = true;
+        }
     }
     if ($kept === []) {
         throw new InvalidArgumentException('Keep at least one channel.');
     }
-    epgProgressEmit('Saving the playlist…');
     $headerText = rtrim(implode("\n", $header), "\n");
     if ($headerText === '' || !str_starts_with($headerText, '#EXTM3U')) {
         $headerText = '#EXTM3U';
     }
-    $next = $headerText . "\n" . implode('', $kept);
+
+    return $headerText . "\n" . implode('', $kept);
+}
+
+function homeSavePlaylistSelection(string $token, int $userId, string $layoutJson): void
+{
+    if (homeForEditor($token, $userId) === null) {
+        throw new InvalidArgumentException('This house was not found.');
+    }
+    $path = homePlaylistPath($token);
+    $body = is_file($path) ? file_get_contents($path) : false;
+    if (!is_string($body) || $body === '') {
+        throw new InvalidArgumentException('This house has no playlist yet.');
+    }
+    $layout = json_decode($layoutJson, true);
+    if (!is_array($layout)) {
+        throw new InvalidArgumentException('The playlist could not be read.');
+    }
+    $next = playlistApplyLayout($body, $layout);
+    epgProgressEmit('Saving the playlist…');
     $tmp = $path . '.tmp';
     if (file_put_contents($tmp, $next, LOCK_EX) === false) {
         throw new RuntimeException('The playlist could not be saved.');

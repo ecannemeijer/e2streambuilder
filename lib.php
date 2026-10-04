@@ -202,14 +202,14 @@ function appThemeScript(): void
 function appShellStyle(): void
 {
     echo '<style>
-#loading,#help,#xtream,#receiver,#add-house,#login,#register,#forgot,#password,#remote,#contact,#search-results{display:none !important}
-#loading.is-open,#help.is-open,#xtream.is-open,#receiver.is-open,#add-house.is-open,#login.is-open,#register.is-open,#forgot.is-open,#password.is-open,#remote.is-open,#contact.is-open,#search-results.is-open{display:flex !important;position:fixed !important;top:0;right:0;bottom:0;left:0;z-index:4000;align-items:center;justify-content:center;margin:0;padding:24px;background:rgba(0,0,0,.55);color:#f4f7f4}
+#loading,#help,#xtream,#receiver,#add-house,#login,#register,#forgot,#password,#remote,#contact,#search-results,#leave-guard{display:none !important}
+#loading.is-open,#help.is-open,#xtream.is-open,#receiver.is-open,#add-house.is-open,#login.is-open,#register.is-open,#forgot.is-open,#password.is-open,#remote.is-open,#contact.is-open,#search-results.is-open,#leave-guard.is-open{display:flex !important;position:fixed !important;top:0;right:0;bottom:0;left:0;z-index:4000;align-items:center;justify-content:center;margin:0;padding:24px;background:rgba(0,0,0,.55);color:#f4f7f4}
 #loading.is-open{flex-direction:column;gap:14px;z-index:5000 !important}
 #loading p{max-width:36rem;margin:0;text-align:center;line-height:1.45;word-break:break-word}
 #loading .spinner{width:46px;height:46px;border:4px solid rgba(255,255,255,.28);border-top-color:#e2a85a;border-radius:50%;animation:e2spin .8s linear infinite}
-#help .dialog,#xtream .dialog,#receiver .dialog,#add-house .dialog,#login .dialog,#register .dialog,#forgot .dialog,#password .dialog,#remote .dialog,#contact .dialog,#search-results .dialog{width:min(640px,100%);max-height:min(80vh,720px);overflow:auto;background:var(--raise,#181e19);color:var(--text,#e7efe6);border:1px solid var(--line,#313a32);border-radius:14px;padding:18px;box-shadow:0 18px 40px rgba(0,0,0,.35)}
+#help .dialog,#xtream .dialog,#receiver .dialog,#add-house .dialog,#login .dialog,#register .dialog,#forgot .dialog,#password .dialog,#remote .dialog,#contact .dialog,#search-results .dialog,#leave-guard .dialog{width:min(640px,100%);max-height:min(80vh,720px);overflow:auto;background:var(--raise,#181e19);color:var(--text,#e7efe6);border:1px solid var(--line,#313a32);border-radius:14px;padding:18px;box-shadow:0 18px 40px rgba(0,0,0,.35)}
 #remote .dialog{width:min(720px,100%)}
-#help .dialog h2,#xtream .dialog h2,#receiver .dialog h2,#add-house .dialog h2,#login .dialog h2,#register .dialog h2,#forgot .dialog h2,#password .dialog h2,#remote .dialog h2,#contact .dialog h2,#search-results .dialog h2{margin:0 0 8px}
+#help .dialog h2,#xtream .dialog h2,#receiver .dialog h2,#add-house .dialog h2,#login .dialog h2,#register .dialog h2,#forgot .dialog h2,#password .dialog h2,#remote .dialog h2,#contact .dialog h2,#search-results .dialog h2,#leave-guard .dialog h2{margin:0 0 8px}
 #help .dialog p,#help .dialog li,#xtream .dialog p,#xtream .dialog li,#receiver .dialog p,#add-house .dialog p,#login .dialog p,#register .dialog p,#forgot .dialog p,#password .dialog p,#remote .dialog p,#remote .dialog li{color:var(--muted,#93a196)}
 #login .dialog p.error,#register .dialog p.error,#forgot .dialog p.error,#password .dialog p.error,#add-house .dialog p.error,#receiver .dialog p.error,#contact .dialog p.error,#login .dialog p.login-alert{color:#e07a68 !important;font-weight:700}
 #forgot .dialog p.oknote{color:#8fbf7a !important;font-weight:700}
@@ -274,6 +274,7 @@ document.addEventListener("DOMContentLoaded",function(){
   bindOverlay("forgot","forgot-open");
   bindOverlay("contact","contact-open");
   bindOverlay("search-results","search-results-open");
+  bindOverlay("leave-guard","leave-guard-open");
   document.querySelectorAll("#add-house-open,#password-open,#login-open,#register-open").forEach(function(button){
     button.addEventListener("click",function(){
       var id=button.id.replace(/-open$/,"");
@@ -354,8 +355,16 @@ document.addEventListener("DOMContentLoaded",function(){
           if(data.text)showLoading(data.text);
           if(data.done){
             finished=true;
+            if(data.error)window.playlistAfterSave=null;
+            else if(window.playlistClearDirty)window.playlistClearDirty();
+            if(!data.error&&window.playlistAfterSave){
+              var afterSave=window.playlistAfterSave;
+              window.playlistAfterSave=null;
+              afterSave();
+              return;
+            }
             if(data.redirect)location.href=data.redirect;
-            else location.reload();
+            else if(!data.error)location.reload();
           }
         }
         function pump(){

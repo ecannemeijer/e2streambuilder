@@ -30,6 +30,25 @@ if (isset($_GET['download'])) {
     exit;
 }
 
+function playlistEditNext(string $next): string
+{
+    $next = str_replace(["\r", "\n"], '', $next);
+    if (preg_match('/^(index|epg|epg-mapping|users|eit|settings)\.php$/', $next) === 1) {
+        return $next;
+    }
+    if (preg_match('/^index\.php\?house=([a-f0-9]{32})$/', $next, $match) === 1 && homeTokenOk($match[1])) {
+        return 'index.php?house=' . $match[1];
+    }
+    if (preg_match('/^index\.php\?open=(add-house|login|register|password)$/', $next) === 1) {
+        return $next;
+    }
+    if (preg_match('/^playlist-edit\.php\?house=([a-f0-9]{32})$/', $next, $match) === 1 && homeTokenOk($match[1])) {
+        return 'playlist-edit.php?house=' . $match[1];
+    }
+
+    return '';
+}
+
 $error = null;
 $progress = $_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['progress'] ?? '') === '1';
 $back = 'playlist-edit.php?house=' . rawurlencode($token);
@@ -39,9 +58,11 @@ if ($progress) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         authCsrfCheck();
-        $raw = (string) ($_POST['keep'] ?? '');
-        $keep = $raw === '' ? [] : explode(',', $raw);
-        homeSavePlaylistSelection($token, (int) $account['id'], $keep);
+        $next = playlistEditNext((string) ($_POST['next'] ?? ''));
+        if ($next !== '') {
+            $back = $next;
+        }
+        homeSavePlaylistSelection($token, (int) $account['id'], (string) ($_POST['layout'] ?? ''));
         $_SESSION['app_notice'] = 'Playlist saved.';
         session_write_close();
         if ($progress) {
@@ -93,7 +114,7 @@ if (is_string($body) && $body !== '') {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Edit playlist · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=31">
+    <link rel="stylesheet" href="assets/app.css?v=33">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">
@@ -102,7 +123,7 @@ if (is_string($body) && $body !== '') {
     <?php appMenubar('playlist', $token); ?>
     <header class="pagehead">
         <h1>Edit playlist</h1>
-        <p class="lede"><?= h((string) $home['name']) ?>. Turn categories and channels off, then save. Publishing this house again replaces this list with the channels from the receiver.</p>
+        <p class="lede"><?= h((string) $home['name']) ?>. Turn categories and channels off, rename them, or move them, then save. Publishing this house again replaces this list with the channels from the receiver.</p>
     </header>
 
     <?php if ($error !== null): ?>
@@ -118,7 +139,8 @@ if (is_string($body) && $body !== '') {
         <form method="post" action="playlist-edit.php" id="edit-form">
             <?= authCsrfField() ?>
             <input type="hidden" name="house" value="<?= h($token) ?>">
-            <input type="hidden" name="keep" id="edit-keep" value="">
+            <input type="hidden" name="layout" id="edit-layout" value="">
+            <input type="hidden" name="next" id="edit-next" value="">
             <div class="edit-tools">
                 <label class="field"><span>Search channel</span>
                     <input id="channel-search" type="search" placeholder="Channel name" autocomplete="off">
@@ -155,6 +177,65 @@ if (is_string($body) && $body !== '') {
                 return on === 0 ? "off" : (on === group.channels.length ? "on" : "mixed");
             }
 
+            function snapshot() {
+                return JSON.stringify(groups.map(function (group) {
+                    return {
+                        name: group.name,
+                        channels: group.channels.map(function (channel) {
+                            return {index: channel.index, name: channel.name, on: !!channel.on};
+                        })
+                    };
+                }));
+            }
+
+            var baseline = snapshot();
+            var dirty = false;
+            var pendingUrl = "";
+            var pendingForm = null;
+            window.playlistClearDirty = function () { dirty = false; };
+
+            function mark() {
+                dirty = snapshot() !== baseline;
+            }
+
+            function moveItem(list, index, delta) {
+                var next = index + delta;
+                if (next < 0 || next >= list.length) return -1;
+                var item = list.splice(index, 1)[0];
+                list.splice(next, 0, item);
+                return next;
+            }
+
+            function moveButtons(index, length, onMove) {
+                var wrap = document.createElement("span");
+                wrap.className = "edit-move";
+                [["Move up", "↑", -1], ["Move down", "↓", 1]].forEach(function (spec) {
+                    var button = document.createElement("button");
+                    button.type = "button";
+                    button.className = "btn";
+                    button.setAttribute("aria-label", spec[0]);
+                    button.textContent = spec[1];
+                    button.disabled = index + spec[2] < 0 || index + spec[2] >= length;
+                    button.addEventListener("click", function () { onMove(spec[2]); });
+                    wrap.appendChild(button);
+                });
+                return wrap;
+            }
+
+            function nameInput(value, label, maxLength, onValue) {
+                var input = document.createElement("input");
+                input.className = "edit-name-input";
+                input.value = value;
+                input.maxLength = maxLength;
+                input.setAttribute("aria-label", label);
+                input.addEventListener("click", function (event) { event.stopPropagation(); });
+                input.addEventListener("input", function () {
+                    onValue(input.value);
+                    mark();
+                });
+                return input;
+            }
+
             function render() {
                 categories.innerHTML = "";
                 groups.forEach(function (group, index) {
@@ -162,7 +243,7 @@ if (is_string($body) && $body !== '') {
                     row.className = "edit-row" + (index === active ? " is-active" : "");
                     var box = document.createElement("input");
                     box.type = "checkbox";
-                    box.setAttribute("aria-label", group.name);
+                    box.setAttribute("aria-label", "Include " + group.name);
                     var mode = state(group);
                     box.checked = mode !== "off";
                     box.indeterminate = mode === "mixed";
@@ -171,25 +252,39 @@ if (is_string($body) && $body !== '') {
                         group.channels.forEach(function (channel) { channel.on = turnOn; });
                         render();
                     });
-                    var button = document.createElement("button");
-                    button.type = "button";
-                    button.className = "edit-name";
-                    button.textContent = group.name;
-                    button.addEventListener("click", function () {
+                    var name = nameInput(group.name, "Category name", 80, function (value) { group.name = value; });
+                    name.addEventListener("focus", function () {
+                        if (active === index) return;
                         active = index;
                         render();
+                        var inputs = categories.querySelectorAll(".edit-name-input");
+                        if (inputs[index]) inputs[index].focus();
                     });
                     var count = document.createElement("span");
                     count.className = "meta";
                     count.textContent = String(group.channels.length);
                     row.appendChild(box);
-                    row.appendChild(button);
+                    row.appendChild(name);
+                    row.appendChild(moveButtons(index, groups.length, function (delta) {
+                        var next = moveItem(groups, index, delta);
+                        if (next < 0) return;
+                        active = next;
+                        render();
+                    }));
                     row.appendChild(count);
+                    row.addEventListener("click", function (event) {
+                        if (event.target.closest("input,button")) return;
+                        active = index;
+                        render();
+                    });
                     categories.appendChild(row);
                 });
                 channelBox.innerHTML = "";
                 var group = groups[active];
-                if (!group) return;
+                if (!group) {
+                    mark();
+                    return;
+                }
                 group.channels.forEach(function (channel, index) {
                     var row = document.createElement("div");
                     row.className = "edit-row";
@@ -197,18 +292,21 @@ if (is_string($body) && $body !== '') {
                     var box = document.createElement("input");
                     box.type = "checkbox";
                     box.checked = channel.on;
-                    box.setAttribute("aria-label", channel.name);
+                    box.setAttribute("aria-label", "Include " + channel.name);
                     box.addEventListener("change", function () {
                         channel.on = box.checked;
                         render();
                     });
-                    var name = document.createElement("span");
-                    name.className = "edit-name";
-                    name.textContent = channel.name;
+                    var name = nameInput(channel.name, "Channel name", 120, function (value) { channel.name = value; });
                     row.appendChild(box);
                     row.appendChild(name);
+                    row.appendChild(moveButtons(index, group.channels.length, function (delta) {
+                        if (moveItem(group.channels, index, delta) < 0) return;
+                        render();
+                    }));
                     channelBox.appendChild(row);
                 });
+                mark();
             }
 
             function collect() {
@@ -248,6 +346,7 @@ if (is_string($body) && $body !== '') {
                 }
                 if (matches.length === 0) {
                     note.hidden = false;
+                    note.textContent = "No channel with that name.";
                     return;
                 }
                 note.hidden = true;
@@ -281,18 +380,136 @@ if (is_string($body) && $body !== '') {
                 event.preventDefault();
                 openResults();
             });
-            document.getElementById("edit-form").addEventListener("submit", function () {
-                var keep = [];
+            function layoutPayload() {
+                var layout = [];
+                var seen = {};
+                var duplicate = false;
                 groups.forEach(function (group) {
+                    var channels = [];
                     group.channels.forEach(function (channel) {
-                        if (channel.on) keep.push(channel.index);
+                        if (!channel.on) return;
+                        var name = channel.name.trim();
+                        channels.push({index: channel.index, name: name === "" ? "Channel" : name});
                     });
+                    if (!channels.length) return;
+                    var name = group.name.trim();
+                    if (name === "") name = "Channels";
+                    var key = name.toLowerCase();
+                    if (seen[key]) duplicate = true;
+                    seen[key] = true;
+                    layout.push({name: name, channels: channels});
                 });
-                document.getElementById("edit-keep").value = keep.join(",");
+                return {layout: layout, duplicate: duplicate};
+            }
+
+            function pageTarget(href) {
+                var parsed = new URL(href, location.href);
+                if (parsed.origin !== location.origin) return "";
+                var file = parsed.pathname.split("/").pop() || "index.php";
+                return file + parsed.search;
+            }
+
+            function openGuard(url, form) {
+                pendingUrl = url || "";
+                pendingForm = form || null;
+                document.getElementById("leave-guard").classList.add("is-open");
+            }
+
+            document.getElementById("edit-form").addEventListener("submit", function (event) {
+                var payload = layoutPayload();
+                if (payload.duplicate || payload.layout.length === 0) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    document.getElementById("edit-next").value = "";
+                    window.playlistAfterSave = null;
+                    note.hidden = false;
+                    note.textContent = payload.duplicate ? "Each category needs its own name." : "Keep at least one channel.";
+                    return;
+                }
+                note.hidden = true;
+                document.getElementById("edit-layout").value = JSON.stringify(payload.layout);
             }, true);
+
+            document.getElementById("leave-save").addEventListener("click", function () {
+                document.getElementById("leave-guard").classList.remove("is-open");
+                var form = pendingForm;
+                pendingForm = null;
+                if (form) {
+                    window.playlistAfterSave = function () {
+                        if (form.requestSubmit) form.requestSubmit();
+                        else form.submit();
+                    };
+                    document.getElementById("edit-next").value = "";
+                } else {
+                    window.playlistAfterSave = null;
+                    document.getElementById("edit-next").value = pendingUrl;
+                }
+                document.getElementById("edit-form").requestSubmit();
+            });
+
+            document.addEventListener("click", function (event) {
+                if (!dirty) return;
+                var addHouse = event.target.closest("#add-house-open");
+                if (addHouse && !document.getElementById("add-house")) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openGuard("index.php?open=add-house", null);
+                    return;
+                }
+                var link = event.target.closest(".menubar a[href]");
+                if (!link) return;
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.target === "_blank") return;
+                var href = link.getAttribute("href") || "";
+                if (href === "" || href.charAt(0) === "#") return;
+                event.preventDefault();
+                event.stopPropagation();
+                openGuard(pageTarget(link.href), null);
+            }, true);
+
+            document.addEventListener("submit", function (event) {
+                if (!dirty) return;
+                var form = event.target;
+                if (!form || !form.closest || !form.closest(".menubar")) return;
+                event.preventDefault();
+                event.stopPropagation();
+                openGuard("", form);
+            }, true);
+
+            var housePick = document.getElementById("house-pick");
+            var houseWas = housePick ? housePick.value : "";
+            if (housePick) {
+                document.addEventListener("change", function (event) {
+                    if (event.target !== housePick) return;
+                    if (!dirty) {
+                        houseWas = housePick.value;
+                        return;
+                    }
+                    var next = housePick.value;
+                    housePick.value = houseWas;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openGuard("index.php?house=" + encodeURIComponent(next), null);
+                }, true);
+            }
+
+            window.addEventListener("beforeunload", function (event) {
+                if (!dirty) return;
+                event.preventDefault();
+                event.returnValue = "";
+            });
             render();
         })();
         </script>
+        <div id="leave-guard">
+            <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="leave-title">
+                <h2 id="leave-title">Save the playlist?</h2>
+                <p>This playlist has changes. Save them before leaving this page?</p>
+                <div class="actions">
+                    <button class="btn primary" type="button" id="leave-save">Save</button>
+                    <button class="btn" type="button" data-close>Cancel</button>
+                </div>
+            </div>
+        </div>
         <div id="search-results">
             <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="search-title">
                 <h2 id="search-title">Channels</h2>
