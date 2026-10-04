@@ -713,6 +713,7 @@ function homeSavePlaylistSelection(string $token, int $userId, array $keep): voi
     if ($kept === []) {
         throw new InvalidArgumentException('Keep at least one channel.');
     }
+    epgProgressEmit('Saving the playlist…');
     $headerText = rtrim(implode("\n", $header), "\n");
     if ($headerText === '' || !str_starts_with($headerText, '#EXTM3U')) {
         $headerText = '#EXTM3U';
@@ -727,6 +728,7 @@ function homeSavePlaylistSelection(string $token, int $userId, array $keep): voi
         throw new RuntimeException('The playlist could not be saved.');
     }
     @set_time_limit(0);
+    epgProgressEmit('Rebuilding the guide…');
     try {
         epgGenerateXml(playlistIdsInBody($next), homeEpgXmlPath($token));
     } catch (Throwable $e) {
@@ -2976,6 +2978,9 @@ function epgGenerateXml(?array $onlyIds = null, ?string $xmlPath = null): array
             continue;
         }
         $sourceId = (int) $source['id'];
+        if (!empty($GLOBALS['epg_progress'])) {
+            epgProgressEmit('Reading ' . (string) ($source['name'] ?? 'source'));
+        }
         epgWalkElements($path, static function (string $name, array $attributes, string $outer) use ($handle, $owners, $sourceId, &$programmes, &$seen): void {
             if ($name !== 'programme') {
                 return;
@@ -2991,6 +2996,9 @@ function epgGenerateXml(?array $onlyIds = null, ?string $xmlPath = null): array
             $seen[$key] = true;
             fwrite($handle, $outer . "\n");
             $programmes++;
+            if (!empty($GLOBALS['epg_progress']) && $programmes % 2000 === 0) {
+                epgProgressEmit('Rebuilding the guide… ' . $programmes . ' programmes');
+            }
         });
     }
     fwrite($handle, "</tv>\n");

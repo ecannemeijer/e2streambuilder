@@ -15,28 +15,52 @@ if ($home === null) {
     exit;
 }
 
-$notice = null;
 $error = null;
+$progress = $_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['progress'] ?? '') === '1';
+$back = 'playlist-edit.php?house=' . rawurlencode($token);
+if ($progress) {
+    epgProgressBegin();
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         authCsrfCheck();
         $raw = (string) ($_POST['keep'] ?? '');
         $keep = $raw === '' ? [] : explode(',', $raw);
         homeSavePlaylistSelection($token, (int) $account['id'], $keep);
-        header('Location: playlist-edit.php?house=' . rawurlencode($token) . '&saved=1');
+        $_SESSION['app_notice'] = 'Playlist saved.';
+        session_write_close();
+        if ($progress) {
+            epgProgressEmit('Playlist saved.', true, false, $back);
+            exit;
+        }
+        header('Location: ' . $back);
         exit;
     } catch (InvalidArgumentException $e) {
-        $error = $e->getMessage();
-        if ($e->getMessage() === 'The playlist was saved, but the guide could not be rebuilt.') {
-            $notice = 'Playlist saved.';
+        $savedAnyway = $e->getMessage() === 'The playlist was saved, but the guide could not be rebuilt.';
+        if ($savedAnyway) {
+            $_SESSION['app_notice'] = 'Playlist saved.';
+            $_SESSION['app_error'] = $e->getMessage();
+            session_write_close();
+            if ($progress) {
+                epgProgressEmit($e->getMessage(), true, true, $back);
+                exit;
+            }
+            header('Location: ' . $back);
+            exit;
         }
+        if ($progress) {
+            epgProgressEmit($e->getMessage(), true, true);
+            exit;
+        }
+        $error = $e->getMessage();
     } catch (Throwable $e) {
-        $error = authHiddenError($e);
+        $message = authHiddenError($e);
+        if ($progress) {
+            epgProgressEmit($message, true, true);
+            exit;
+        }
+        $error = $message;
     }
-}
-
-if (isset($_GET['saved'])) {
-    $notice = 'Playlist saved.';
 }
 
 $path = homePlaylistPath($token);
@@ -54,7 +78,7 @@ if (is_string($body) && $body !== '') {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Edit playlist · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=28">
+    <link rel="stylesheet" href="assets/app.css?v=29">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">
@@ -68,9 +92,6 @@ if (is_string($body) && $body !== '') {
 
     <?php if ($error !== null): ?>
         <p class="error"><?= h($error) ?></p>
-    <?php endif; ?>
-    <?php if ($notice !== null): ?>
-        <p class="oknote"><?= h($notice) ?></p>
     <?php endif; ?>
 
     <?php if ($groups === []): ?>
@@ -110,7 +131,6 @@ if (is_string($body) && $body !== '') {
             var search = document.getElementById("channel-search");
             var note = document.getElementById("channel-find-note");
             var matches = [];
-            var cursor = -1;
             var query = "";
 
             function state(group) {
@@ -189,16 +209,25 @@ if (is_string($body) && $body !== '') {
                 return found;
             }
 
-            function showMatch(step) {
-                var nextQuery = search.value;
-                if (nextQuery !== query) {
-                    query = nextQuery;
-                    matches = collect();
-                    cursor = -1;
-                }
+            function focusChannel(hit) {
+                active = hit.group;
+                render();
+                var row = channelBox.querySelector('[data-channel="' + hit.channel + '"]');
+                if (!row) return;
+                row.classList.add("is-hit");
+                row.tabIndex = -1;
+                row.scrollIntoView({block: "center"});
+                row.focus();
+            }
+
+            function openResults() {
+                query = search.value;
+                matches = collect();
+                var list = document.getElementById("search-list");
+                var overlay = document.getElementById("search-results");
+                list.innerHTML = "";
                 if (query.trim() === "") {
                     note.hidden = true;
-                    render();
                     return;
                 }
                 if (matches.length === 0) {
@@ -206,26 +235,35 @@ if (is_string($body) && $body !== '') {
                     return;
                 }
                 note.hidden = true;
-                cursor = step ? (cursor + 1) % matches.length : 0;
-                var hit = matches[cursor];
-                active = hit.group;
-                render();
-                var row = channelBox.querySelector('[data-channel="' + hit.channel + '"]');
-                if (!row) return;
-                row.classList.add("is-hit");
-                row.scrollIntoView({block: "nearest"});
+                matches.slice(0, 40).forEach(function (hit) {
+                    var button = document.createElement("button");
+                    button.type = "button";
+                    button.className = "btn search-hit";
+                    var strong = document.createElement("strong");
+                    strong.textContent = groups[hit.group].channels[hit.channel].name;
+                    var category = document.createElement("span");
+                    category.textContent = groups[hit.group].name;
+                    button.appendChild(strong);
+                    button.appendChild(category);
+                    button.addEventListener("click", function () {
+                        overlay.classList.remove("is-open");
+                        focusChannel(hit);
+                    });
+                    list.appendChild(button);
+                });
+                if (matches.length > 40) {
+                    var more = document.createElement("p");
+                    more.textContent = "Showing the first 40 matches.";
+                    list.appendChild(more);
+                }
+                overlay.classList.add("is-open");
             }
 
-            document.getElementById("channel-find").addEventListener("click", function () {
-                showMatch(false);
-            });
-            search.addEventListener("input", function () {
-                showMatch(false);
-            });
+            document.getElementById("channel-find").addEventListener("click", openResults);
             search.addEventListener("keydown", function (event) {
                 if (event.key !== "Enter") return;
                 event.preventDefault();
-                showMatch(true);
+                openResults();
             });
             document.getElementById("edit-form").addEventListener("submit", function () {
                 var keep = [];
@@ -235,10 +273,17 @@ if (is_string($body) && $body !== '') {
                     });
                 });
                 document.getElementById("edit-keep").value = keep.join(",");
-            });
+            }, true);
             render();
         })();
         </script>
+        <div id="search-results">
+            <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="search-title">
+                <h2 id="search-title">Channels</h2>
+                <div id="search-list"></div>
+                <button class="btn" type="button" data-close>Close</button>
+            </div>
+        </div>
     <?php endif; ?>
 </div>
 </body>

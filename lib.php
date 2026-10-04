@@ -71,6 +71,7 @@ function appNav(string $active): void
         echo '<option value="' . h($value) . '">' . h($label) . '</option>';
     }
     echo '</select></label>';
+    echo '<button class="btn" type="button" id="contact-open">Contact</button>';
     echo '<button class="btn" type="button" id="help-open">How it works</button>';
     $version = appVersion();
     if ($version !== '') {
@@ -94,6 +95,7 @@ function appMenubar(string $active, string $activeHouse = ''): void
         echo '<button class="nav-btn" type="button" id="login-open">Log in</button>';
         echo '<button class="nav-btn" type="button" id="register-open">Create account</button>';
         echo '</header>';
+        appFlash();
 
         return;
     }
@@ -123,6 +125,54 @@ function appMenubar(string $active, string $activeHouse = ''): void
     echo '<button class="nav-btn" type="submit">Log out</button>';
     echo '</form>';
     echo '</header>';
+    appFlash();
+}
+
+function appFlash(): void
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        return;
+    }
+    $notice = trim((string) ($_SESSION['app_notice'] ?? ''));
+    $error = trim((string) ($_SESSION['app_error'] ?? ''));
+    unset($_SESSION['app_notice'], $_SESSION['app_error']);
+    if ($notice !== '') {
+        echo '<p class="flash ok" role="status">' . h($notice) . '</p>';
+    }
+    if ($error !== '') {
+        echo '<p class="flash bad" role="alert">' . h($error) . '</p>';
+    }
+}
+
+function appReturnPath(): string
+{
+    $script = basename((string) ($_SERVER['SCRIPT_NAME'] ?? 'index.php'));
+    $allowed = ['index.php', 'epg.php', 'epg-mapping.php', 'users.php', 'eit.php', 'playlist-edit.php', 'reset.php'];
+    if (!in_array($script, $allowed, true)) {
+        return 'index.php';
+    }
+    $house = (string) ($_GET['house'] ?? '');
+    if ($script === 'playlist-edit.php' && function_exists('homeTokenOk') && homeTokenOk($house)) {
+        return 'playlist-edit.php?house=' . rawurlencode($house);
+    }
+    if ($script === 'reset.php') {
+        return 'index.php';
+    }
+
+    return $script;
+}
+
+function appSafeReturn(string $return): string
+{
+    $return = str_replace(["\r", "\n"], '', $return);
+    if (preg_match('/^(index|epg|epg-mapping|users|eit|reset)\.php$/', $return) === 1) {
+        return $return === 'reset.php' ? 'index.php' : $return;
+    }
+    if (preg_match('/^playlist-edit\.php\?house=([a-f0-9]{32})$/', $return, $match) === 1 && homeTokenOk($match[1])) {
+        return 'playlist-edit.php?house=' . $match[1];
+    }
+
+    return 'index.php';
 }
 
 function appThemeScript(): void
@@ -135,18 +185,18 @@ function appThemeScript(): void
 function appShellStyle(): void
 {
     echo '<style>
-#loading,#help,#xtream,#receiver,#add-house,#login,#register,#forgot,#password,#remote{display:none !important}
-#loading.is-open,#help.is-open,#xtream.is-open,#receiver.is-open,#add-house.is-open,#login.is-open,#register.is-open,#forgot.is-open,#password.is-open,#remote.is-open{display:flex !important;position:fixed !important;top:0;right:0;bottom:0;left:0;z-index:4000;align-items:center;justify-content:center;margin:0;padding:24px;background:rgba(0,0,0,.55);color:#f4f7f4}
+#loading,#help,#xtream,#receiver,#add-house,#login,#register,#forgot,#password,#remote,#contact,#search-results{display:none !important}
+#loading.is-open,#help.is-open,#xtream.is-open,#receiver.is-open,#add-house.is-open,#login.is-open,#register.is-open,#forgot.is-open,#password.is-open,#remote.is-open,#contact.is-open,#search-results.is-open{display:flex !important;position:fixed !important;top:0;right:0;bottom:0;left:0;z-index:4000;align-items:center;justify-content:center;margin:0;padding:24px;background:rgba(0,0,0,.55);color:#f4f7f4}
 #loading.is-open{flex-direction:column;gap:14px;z-index:5000 !important}
 #loading p{max-width:36rem;margin:0;text-align:center;line-height:1.45;word-break:break-word}
 #loading .spinner{width:46px;height:46px;border:4px solid rgba(255,255,255,.28);border-top-color:#e2a85a;border-radius:50%;animation:e2spin .8s linear infinite}
-#help .dialog,#xtream .dialog,#receiver .dialog,#add-house .dialog,#login .dialog,#register .dialog,#forgot .dialog,#password .dialog,#remote .dialog{width:min(640px,100%);max-height:min(80vh,720px);overflow:auto;background:var(--raise,#181e19);color:var(--text,#e7efe6);border:1px solid var(--line,#313a32);border-radius:14px;padding:18px;box-shadow:0 18px 40px rgba(0,0,0,.35)}
+#help .dialog,#xtream .dialog,#receiver .dialog,#add-house .dialog,#login .dialog,#register .dialog,#forgot .dialog,#password .dialog,#remote .dialog,#contact .dialog,#search-results .dialog{width:min(640px,100%);max-height:min(80vh,720px);overflow:auto;background:var(--raise,#181e19);color:var(--text,#e7efe6);border:1px solid var(--line,#313a32);border-radius:14px;padding:18px;box-shadow:0 18px 40px rgba(0,0,0,.35)}
 #remote .dialog{width:min(720px,100%)}
-#help .dialog h2,#xtream .dialog h2,#receiver .dialog h2,#add-house .dialog h2,#login .dialog h2,#register .dialog h2,#forgot .dialog h2,#password .dialog h2,#remote .dialog h2{margin:0 0 8px}
+#help .dialog h2,#xtream .dialog h2,#receiver .dialog h2,#add-house .dialog h2,#login .dialog h2,#register .dialog h2,#forgot .dialog h2,#password .dialog h2,#remote .dialog h2,#contact .dialog h2,#search-results .dialog h2{margin:0 0 8px}
 #help .dialog p,#help .dialog li,#xtream .dialog p,#xtream .dialog li,#receiver .dialog p,#add-house .dialog p,#login .dialog p,#register .dialog p,#forgot .dialog p,#password .dialog p,#remote .dialog p,#remote .dialog li{color:var(--muted,#93a196)}
-#login .dialog p.error,#register .dialog p.error,#forgot .dialog p.error,#password .dialog p.error,#add-house .dialog p.error,#receiver .dialog p.error,#login .dialog p.login-alert{color:#e07a68 !important;font-weight:700}
+#login .dialog p.error,#register .dialog p.error,#forgot .dialog p.error,#password .dialog p.error,#add-house .dialog p.error,#receiver .dialog p.error,#contact .dialog p.error,#login .dialog p.login-alert{color:#e07a68 !important;font-weight:700}
 #forgot .dialog p.oknote{color:#8fbf7a !important;font-weight:700}
-#login .dialog .field input,#register .dialog .field input,#forgot .dialog .field input,#password .dialog .field input,#add-house .dialog .field input{width:100%;box-sizing:border-box}
+#login .dialog .field input,#register .dialog .field input,#forgot .dialog .field input,#password .dialog .field input,#add-house .dialog .field input,#contact .dialog .field input,#contact .dialog .field textarea{width:100%;box-sizing:border-box}
 #help .dialog ol{margin:0 0 12px;padding-left:1.2rem}
 @keyframes e2spin{to{transform:rotate(360deg)}}
 html[data-theme="light"]{color-scheme:light;--bg:#f4f1ea !important;--raise:#fffdf8 !important;--raise-2:#efe8dc !important;--line:#d7cec0 !important;--text:#241c14 !important;--muted:#6d645b !important;--accent:#b86a1d !important;--accent-ink:#fff8ef !important;--accent-line:#8d4e12 !important;--good:#2f7d46 !important;--warn:#a15c12 !important;--bad:#b42318 !important;--sat:#3d5a73 !important;--stage:#1c1916 !important;--shadow:0 18px 40px rgba(70,48,20,.12) !important}
@@ -205,6 +255,8 @@ document.addEventListener("DOMContentLoaded",function(){
   bindOverlay("password","password-open");
   bindOverlay("register","register-open");
   bindOverlay("forgot","forgot-open");
+  bindOverlay("contact","contact-open");
+  bindOverlay("search-results","search-results-open");
   document.querySelectorAll("#add-house-open,#password-open,#login-open,#register-open").forEach(function(button){
     button.addEventListener("click",function(){
       var id=button.id.replace(/-open$/,"");
@@ -258,12 +310,14 @@ document.addEventListener("DOMContentLoaded",function(){
     var isXtream=target.indexOf("xtream-build.php")!==-1;
     var isCreate=target.indexOf("create-all.php")!==-1;
     var isEit=action==="build_eit";
-    if(!isDownload&&!isXtream&&!isCreate&&!isEit)return false;
+    var isEdit=target.indexOf("playlist-edit.php")!==-1;
+    if(!isDownload&&!isXtream&&!isCreate&&!isEit&&!isEdit)return false;
     event.preventDefault();
     var startText="Starting the EPG download…";
     if(isXtream)startText="Starting the Xtream build…";
     if(isCreate)startText="Reading channels from the receiver…";
     if(isEit)startText="Reading the receiver guide…";
+    if(isEdit)startText="Saving the playlist…";
     showLoading(startText);
     var body=new FormData(form);
     if(submitter&&submitter.name)body.append(submitter.name,submitter.value);
@@ -323,7 +377,7 @@ document.addEventListener("DOMContentLoaded",function(){
   if(/(?:^|\\/)(?:epg(?:-mapping)?|eit)\\.php$/.test(location.pathname)){
     document.querySelectorAll("form").forEach(onWork);
   }
-  document.querySelectorAll("form.slow,form[action=\\"create-all.php\\"]").forEach(onWork);
+  document.querySelectorAll("form.slow,form[action=\\"create-all.php\\"],form[action=\\"playlist-edit.php\\"]").forEach(onWork);
 });
 </script>';
 }
@@ -363,9 +417,44 @@ function appChrome(): void
     }
     echo '<button class="btn primary" type="button" data-close-help>Close</button>';
     echo '</div></div>';
+    appContactModal();
     if ($admin) {
         appXtreamModal();
     }
+}
+
+function appContactModal(): void
+{
+    $subject = '';
+    $message = '';
+    $error = '';
+    $open = false;
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        $form = $_SESSION['contact_form'] ?? null;
+        if (is_array($form)) {
+            $subject = (string) ($form['subject'] ?? '');
+            $message = (string) ($form['message'] ?? '');
+        }
+        $error = trim((string) ($_SESSION['contact_error'] ?? ''));
+        $open = (string) ($_SESSION['app_open'] ?? '') === 'contact';
+        unset($_SESSION['contact_form'], $_SESSION['contact_error'], $_SESSION['app_open']);
+    }
+    echo '<div id="contact"' . ($open ? ' class="is-open"' : '') . '>';
+    echo '<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="contact-title">';
+    echo '<h2 id="contact-title">Contact</h2>';
+    echo '<p>Send a message to the author of this site.</p>';
+    if ($error !== '') {
+        echo '<p class="error">' . h($error) . '</p>';
+    }
+    echo '<form class="stack" method="post" action="contact.php">';
+    echo authCsrfField();
+    echo '<input type="hidden" name="return" value="' . h(appReturnPath()) . '">';
+    echo '<label class="field"><span>Subject</span><input name="subject" maxlength="120" required value="' . h($subject) . '"></label>';
+    echo '<label class="field"><span>Message</span><textarea name="message" rows="6" maxlength="4000" required>' . h($message) . '</textarea></label>';
+    echo '<div class="actions"><button class="btn primary" type="submit">Send</button></div>';
+    echo '</form>';
+    echo '<button class="btn" type="button" data-close>Close</button>';
+    echo '</div></div>';
 }
 
 function appXtreamModal(): void

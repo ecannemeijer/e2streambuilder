@@ -292,7 +292,19 @@ body.scroll .menubar {
     border-radius: 10px;
 }
 .edit-row.is-active { background: var(--raise-2); }
-.edit-row.is-hit { outline: 2px solid var(--accent); }
+.edit-row.is-hit,
+.edit-row:focus { outline: 2px solid var(--accent); }
+
+.search-hit {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    margin: 0 0 8px;
+    text-align: left;
+}
+.search-hit strong { color: var(--text); }
+.search-hit span { color: var(--muted); font-size: 0.92rem; }
 .edit-name {
     flex: 1;
     min-width: 0;
@@ -461,6 +473,23 @@ a.btn {
 
 .error { color: var(--bad); }
 .oknote { color: var(--good); }
+
+.flash {
+    margin: 0 0 14px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    font-weight: 700;
+}
+.flash.ok {
+    border: 1px solid var(--good);
+    background: rgba(143, 191, 122, 0.18);
+    color: var(--good);
+}
+.flash.bad {
+    border: 1px solid var(--bad);
+    background: rgba(224, 122, 104, 0.16);
+    color: var(--bad);
+}
 
 .workspace {
     min-height: 0;
