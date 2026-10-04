@@ -84,7 +84,7 @@ $users = authUserList();
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Users · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=25">
+    <link rel="stylesheet" href="assets/app.css?v=26">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">
@@ -110,62 +110,100 @@ $users = authUserList();
     <?php endif; ?>
 
     <section class="panel stack">
-        <?php foreach ($users as $person): ?>
-            <?php
-            $registered = (string) $person['created_at'];
-            if ((string) $person['registered_ip'] !== '') {
-                $registered .= ' from ' . (string) $person['registered_ip'];
-            }
-            $lastLogin = trim((string) $person['last_login_at']);
-            if ($lastLogin === '') {
-                $lastLogin = 'Not yet';
-            } elseif ((string) $person['last_login_ip'] !== '') {
-                $lastLogin .= ' from ' . (string) $person['last_login_ip'];
-            }
-            $blocked = trim((string) $person['locked_at']) !== '';
-            ?>
-            <article class="user-account">
-            <p class="meta">Registered <?= h($registered) ?></p>
-            <p class="meta">Last login <?= h($lastLogin) ?></p>
-            <?php if ($blocked): ?>
-                <p class="meta status bad">Blocked since <?= h((string) $person['locked_at']) ?> after <?= (int) $person['failed_logins'] ?> wrong passwords.</p>
-                <form method="post" action="users.php">
-                    <?= authCsrfField() ?>
-                    <input type="hidden" name="unblock_user" value="1">
-                    <input type="hidden" name="user_id" value="<?= (int) $person['id'] ?>">
-                    <button class="btn" type="submit">Unblock</button>
-                </form>
-            <?php else: ?>
-                <p class="meta">Open<?= (int) $person['failed_logins'] > 0 ? '. ' . (int) $person['failed_logins'] . ' wrong passwords since the last login.' : '' ?></p>
-            <?php endif; ?>
-            <form class="toolbar" method="post" action="users.php">
-                <?= authCsrfField() ?>
-                <input type="hidden" name="save_user" value="1">
-                <input type="hidden" name="user_id" value="<?= (int) $person['id'] ?>">
-                <label class="field"><span>Email</span>
-                    <input name="username" maxlength="254" value="<?= h($person['username']) ?>" required>
-                </label>
-                <label class="field"><span>New password</span>
-                    <input name="password" type="password" maxlength="200" autocomplete="new-password" placeholder="Leave blank to keep">
-                </label>
-                <label class="field"><span>Role</span>
-                    <select class="select" name="role">
-                        <option value="user"<?= $person['role'] === 'user' ? ' selected' : '' ?>>User</option>
-                        <option value="admin"<?= $person['role'] === 'admin' ? ' selected' : '' ?>>Admin</option>
-                    </select>
-                </label>
-                <div class="actions">
-                    <button class="btn primary" type="submit">Save</button>
-                    <button class="btn" type="submit" form="remove-user-<?= (int) $person['id'] ?>">Remove</button>
-                </div>
-            </form>
-            <form id="remove-user-<?= (int) $person['id'] ?>" method="post" action="users.php" onsubmit="return confirm('Remove this account and its houses?');">
-                <?= authCsrfField() ?>
-                <input type="hidden" name="delete_user" value="1">
-                <input type="hidden" name="user_id" value="<?= (int) $person['id'] ?>">
-            </form>
-            </article>
-        <?php endforeach; ?>
+        <div class="table-wrap">
+            <table class="grid users-table">
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>New password</th>
+                        <th>Role</th>
+                        <th>Registered</th>
+                        <th>Last login</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if ($users === []): ?>
+                    <tr><td colspan="7">No accounts yet.</td></tr>
+                <?php endif; ?>
+                <?php foreach ($users as $person): ?>
+                    <?php
+                    $id = (int) $person['id'];
+                    $blocked = trim((string) $person['locked_at']) !== '';
+                    $registeredIp = trim((string) $person['registered_ip']);
+                    $lastAt = trim((string) $person['last_login_at']);
+                    $lastIp = trim((string) $person['last_login_ip']);
+                    ?>
+                    <tr>
+                        <td>
+                            <form id="save-user-<?= $id ?>" method="post" action="users.php">
+                                <?= authCsrfField() ?>
+                                <input type="hidden" name="save_user" value="1">
+                                <input type="hidden" name="user_id" value="<?= $id ?>">
+                            </form>
+                            <input form="save-user-<?= $id ?>" name="username" maxlength="254" value="<?= h($person['username']) ?>" required>
+                        </td>
+                        <td>
+                            <input form="save-user-<?= $id ?>" name="password" type="password" maxlength="200" autocomplete="new-password" placeholder="Keep">
+                        </td>
+                        <td>
+                            <select form="save-user-<?= $id ?>" class="select" name="role">
+                                <option value="user"<?= $person['role'] === 'user' ? ' selected' : '' ?>>User</option>
+                                <option value="admin"<?= $person['role'] === 'admin' ? ' selected' : '' ?>>Admin</option>
+                            </select>
+                        </td>
+                        <td>
+                            <span class="when"><?= h((string) $person['created_at']) ?></span>
+                            <?php if ($registeredIp !== ''): ?>
+                                <span class="when"><?= h($registeredIp) ?></span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ($lastAt === ''): ?>
+                                <span class="when">Not yet</span>
+                            <?php else: ?>
+                                <span class="when"><?= h($lastAt) ?></span>
+                                <?php if ($lastIp !== ''): ?>
+                                    <span class="when"><?= h($lastIp) ?></span>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ($blocked): ?>
+                                <span class="badge error">Blocked</span>
+                                <span class="when"><?= (int) $person['failed_logins'] ?> wrong passwords</span>
+                            <?php else: ?>
+                                <span class="badge ok">Open</span>
+                                <?php if ((int) $person['failed_logins'] > 0): ?>
+                                    <span class="when"><?= (int) $person['failed_logins'] ?> wrong passwords</span>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </td>
+                        <td class="row-actions">
+                            <button class="btn primary" type="submit" form="save-user-<?= $id ?>">Save</button>
+                            <button class="btn" type="submit" form="remove-user-<?= $id ?>">Remove</button>
+                            <?php if ($blocked): ?>
+                                <button class="btn" type="submit" form="unblock-user-<?= $id ?>">Unblock</button>
+                            <?php endif; ?>
+                            <form id="remove-user-<?= $id ?>" method="post" action="users.php" onsubmit="return confirm('Remove this account and its houses?');">
+                                <?= authCsrfField() ?>
+                                <input type="hidden" name="delete_user" value="1">
+                                <input type="hidden" name="user_id" value="<?= $id ?>">
+                            </form>
+                            <?php if ($blocked): ?>
+                                <form id="unblock-user-<?= $id ?>" method="post" action="users.php">
+                                    <?= authCsrfField() ?>
+                                    <input type="hidden" name="unblock_user" value="1">
+                                    <input type="hidden" name="user_id" value="<?= $id ?>">
+                                </form>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     </section>
 </div>
 </body>

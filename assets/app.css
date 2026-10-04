@@ -346,14 +346,20 @@ h1 {
 
 .toolbar .actions, .filters { display: flex; flex-wrap: wrap; gap: 8px; }
 
-.user-account {
-    margin: 0 0 16px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--line);
+.users-table td { vertical-align: middle; }
+.users-table input,
+.users-table select {
+    width: 100%;
+    min-width: 7rem;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 6px 8px;
 }
-.user-account .meta { margin: 0 0 4px; }
-.user-account form { margin: 8px 0 0; }
-.user-account .toolbar { margin-top: 10px; }
+.users-table .when { display: block; color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
+.users-table .row-actions { white-space: nowrap; }
+.users-table .row-actions .btn { padding: 6px 10px; }
+.users-table .row-actions form { display: none; }
 
 .btn {
     border: 1px solid var(--line);
