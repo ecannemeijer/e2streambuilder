@@ -441,6 +441,9 @@ h1 {
     padding: 6px 8px;
 }
 .users-table .when { display: block; color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
+.users-table .house-pick { white-space: nowrap; }
+.users-table .house-pick select { width: auto; min-width: 9rem; }
+.users-table .house-pick .btn { margin-left: 8px; }
 .users-table .row-actions { white-space: nowrap; }
 .users-table .row-actions .btn { padding: 6px 10px; }
 .users-table .row-actions form { display: none; }

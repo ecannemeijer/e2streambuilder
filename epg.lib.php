@@ -578,6 +578,15 @@ function homeForUser(string $token, int $userId): ?array
     return is_array($row) ? $row : null;
 }
 
+function homeForEditor(string $token, int $userId): ?array
+{
+    if (function_exists('authIsAdmin') && authIsAdmin()) {
+        return homeByToken($token);
+    }
+
+    return homeForUser($token, $userId);
+}
+
 /**
  * @return array{header: string, groups: list<array{name: string, channels: list<array{index: int, name: string}>}>}
  */
@@ -661,7 +670,7 @@ function playlistExtinfTitle(string $line): string
  */
 function homeSavePlaylistSelection(string $token, int $userId, array $keep): void
 {
-    if (homeForUser($token, $userId) === null) {
+    if (homeForEditor($token, $userId) === null) {
         throw new InvalidArgumentException('This house was not found.');
     }
     $path = homePlaylistPath($token);

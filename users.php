@@ -84,7 +84,7 @@ $users = authUserList();
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Users · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=31">
+    <link rel="stylesheet" href="assets/app.css?v=32">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">
@@ -114,12 +114,13 @@ $users = authUserList();
                         <th>Registered</th>
                         <th>Last login</th>
                         <th>Status</th>
+                        <th>House</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php if ($users === []): ?>
-                    <tr><td colspan="7">No accounts yet.</td></tr>
+                    <tr><td colspan="8">No accounts yet.</td></tr>
                 <?php endif; ?>
                 <?php foreach ($users as $person): ?>
                     <?php
@@ -174,6 +175,30 @@ $users = authUserList();
                                 <?php endif; ?>
                             <?php endif; ?>
                         </td>
+                        <td class="house-pick">
+                            <?php $houses = homeList($id); ?>
+                            <?php if ($houses === []): ?>
+                                <span class="when">No house</span>
+                            <?php else: ?>
+                                <?php
+                                $readyToken = '';
+                                foreach ($houses as $house) {
+                                    if ($readyToken === '' && homePlaylistChannelCount((string) $house['token']) !== null) {
+                                        $readyToken = (string) $house['token'];
+                                    }
+                                }
+                                ?>
+                                <select class="select user-house-pick" data-edit="edit-m3u8-<?= $id ?>">
+                                    <?php foreach ($houses as $house): ?>
+                                        <?php $ready = homePlaylistChannelCount((string) $house['token']) !== null; ?>
+                                        <option value="<?= h((string) $house['token']) ?>" data-ready="<?= $ready ? '1' : '0' ?>"<?= (string) $house['token'] === $readyToken ? ' selected' : '' ?>><?= h((string) $house['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <?php if ($readyToken !== ''): ?>
+                                    <a class="btn" id="edit-m3u8-<?= $id ?>" href="playlist-edit.php?house=<?= h($readyToken) ?>">Edit m3u8</a>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </td>
                         <td class="row-actions">
                             <button class="btn primary" type="submit" form="save-user-<?= $id ?>">Save</button>
                             <button class="btn" type="submit" form="remove-user-<?= $id ?>">Remove</button>
@@ -201,5 +226,19 @@ $users = authUserList();
     </section>
     <?php appFooter(); ?>
 </div>
+<script>
+document.querySelectorAll('.user-house-pick').forEach(function (pick) {
+    var link = document.getElementById(pick.getAttribute('data-edit'));
+    function sync() {
+        var option = pick.options[pick.selectedIndex];
+        var ready = option && option.getAttribute('data-ready') === '1';
+        if (!link) return;
+        link.href = 'playlist-edit.php?house=' + encodeURIComponent(option ? option.value : '');
+        link.hidden = !ready;
+    }
+    pick.addEventListener('change', sync);
+    sync();
+});
+</script>
 </body>
 </html>

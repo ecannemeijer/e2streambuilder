@@ -9,7 +9,7 @@ if ($account === null) {
 }
 
 $token = (string) ($_POST['house'] ?? $_GET['house'] ?? '');
-$home = homeForUser($token, (int) $account['id']);
+$home = homeForEditor($token, (int) $account['id']);
 if ($home === null) {
     header('Location: index.php');
     exit;
