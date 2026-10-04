@@ -7,6 +7,7 @@ authStart();
 $formError = null;
 $homeError = null;
 $authError = null;
+$authOk = false;
 $authDialog = '';
 $saved = isset($_GET['saved']);
 
@@ -47,6 +48,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['logout'])) {
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['forgot_password'])) {
+    try {
+        authCsrfCheck();
+        authRequestPasswordReset((string) ($_POST['username'] ?? ''));
+        authFail('forgot', 'If that account exists, a message was sent with a link to choose a new password.', (string) ($_POST['username'] ?? ''), true);
+    } catch (InvalidArgumentException $e) {
+        authFail('forgot', $e->getMessage(), (string) ($_POST['username'] ?? ''));
+    } catch (Throwable $e) {
+        authFail('forgot', authHiddenError($e), (string) ($_POST['username'] ?? ''));
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
     try {
         authCsrfCheck();
@@ -75,6 +88,7 @@ $flash = authFlashTake();
 if ($flash['message'] !== '') {
     $authError = $flash['message'];
     $authDialog = $flash['dialog'];
+    $authOk = $flash['ok'];
 }
 $authUsername = $flash['username'];
 $mailNote = null;
@@ -280,6 +294,27 @@ if ($activeHouse === '' && $homes !== []) {
             <div class="actions">
                 <button class="btn primary" type="submit">Log in</button>
                 <button class="btn" type="button" id="login-to-register">Create account</button>
+                <button class="btn" type="button" id="forgot-open">Forgot password</button>
+            </div>
+        </form>
+        <button class="btn" type="button" data-close>Close</button>
+    </div>
+</div>
+<div id="forgot" class="<?= $authDialog === 'forgot' ? 'is-open' : '' ?>">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="forgot-title">
+        <h2 id="forgot-title">Forgot password</h2>
+        <p>Enter the email address of the account. If it exists, a link to choose a new password is sent there. The link works for one hour.</p>
+        <?php if ($authDialog === 'forgot' && $authError !== null): ?>
+            <p class="<?= $authOk ? 'oknote' : 'error' ?>"><?= h($authError) ?></p>
+        <?php endif; ?>
+        <form class="stack" method="post" action="index.php">
+            <?= authCsrfField() ?>
+            <input type="hidden" name="forgot_password" value="1">
+            <label class="field"><span>Email</span>
+                <input name="username" type="email" maxlength="254" autocomplete="email" value="<?= h($authDialog === 'forgot' ? $authUsername : '') ?>" required>
+            </label>
+            <div class="actions">
+                <button class="btn primary" type="submit">Send link</button>
             </div>
         </form>
         <button class="btn" type="button" data-close>Close</button>

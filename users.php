@@ -45,11 +45,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user'])) {
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['unblock_user'])) {
+    try {
+        authCsrfCheck();
+        $unblockId = (int) ($_POST['user_id'] ?? 0);
+        $exists = epgDb()->prepare('SELECT id FROM users WHERE id = ?');
+        $exists->execute([$unblockId]);
+        if (!$exists->fetchColumn()) {
+            throw new InvalidArgumentException('This account was not found.');
+        }
+        authClearLock($unblockId);
+        header('Location: users.php?unblocked=1');
+        exit;
+    } catch (InvalidArgumentException $e) {
+        $error = $e->getMessage();
+    } catch (Throwable $e) {
+        $error = authHiddenError($e);
+    }
+}
+
 if (isset($_GET['saved'])) {
     $notice = 'Account saved.';
 }
 if (isset($_GET['removed'])) {
     $notice = 'Account removed.';
+}
+if (isset($_GET['unblocked'])) {
+    $notice = 'Account unblocked.';
 }
 
 $users = authUserList();
@@ -62,7 +84,7 @@ $users = authUserList();
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Users · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=24">
+    <link rel="stylesheet" href="assets/app.css?v=25">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">
@@ -74,7 +96,7 @@ $users = authUserList();
             <div>
                 <p class="eyebrow">E2 Stream Builder</p>
                 <h1>Users</h1>
-                <p class="lede">Change an email address, set a new password, make an account an admin, or remove it. Removing an account also removes its houses. A new account is always a user.</p>
+                <p class="lede">Change an email address, set a new password, make an account an admin, or remove it. A blocked account tried the wrong password five times. Unblock lets that person log in again. Removing an account also removes its houses.</p>
             </div>
         </div>
     </header>
@@ -89,6 +111,33 @@ $users = authUserList();
 
     <section class="panel stack">
         <?php foreach ($users as $person): ?>
+            <?php
+            $registered = (string) $person['created_at'];
+            if ((string) $person['registered_ip'] !== '') {
+                $registered .= ' from ' . (string) $person['registered_ip'];
+            }
+            $lastLogin = trim((string) $person['last_login_at']);
+            if ($lastLogin === '') {
+                $lastLogin = 'Not yet';
+            } elseif ((string) $person['last_login_ip'] !== '') {
+                $lastLogin .= ' from ' . (string) $person['last_login_ip'];
+            }
+            $blocked = trim((string) $person['locked_at']) !== '';
+            ?>
+            <article class="user-account">
+            <p class="meta">Registered <?= h($registered) ?></p>
+            <p class="meta">Last login <?= h($lastLogin) ?></p>
+            <?php if ($blocked): ?>
+                <p class="meta status bad">Blocked since <?= h((string) $person['locked_at']) ?> after <?= (int) $person['failed_logins'] ?> wrong passwords.</p>
+                <form method="post" action="users.php">
+                    <?= authCsrfField() ?>
+                    <input type="hidden" name="unblock_user" value="1">
+                    <input type="hidden" name="user_id" value="<?= (int) $person['id'] ?>">
+                    <button class="btn" type="submit">Unblock</button>
+                </form>
+            <?php else: ?>
+                <p class="meta">Open<?= (int) $person['failed_logins'] > 0 ? '. ' . (int) $person['failed_logins'] . ' wrong passwords since the last login.' : '' ?></p>
+            <?php endif; ?>
             <form class="toolbar" method="post" action="users.php">
                 <?= authCsrfField() ?>
                 <input type="hidden" name="save_user" value="1">
@@ -115,6 +164,7 @@ $users = authUserList();
                 <input type="hidden" name="delete_user" value="1">
                 <input type="hidden" name="user_id" value="<?= (int) $person['id'] ?>">
             </form>
+            </article>
         <?php endforeach; ?>
     </section>
 </div>

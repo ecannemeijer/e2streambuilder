@@ -346,6 +346,15 @@ h1 {
 
 .toolbar .actions, .filters { display: flex; flex-wrap: wrap; gap: 8px; }
 
+.user-account {
+    margin: 0 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--line);
+}
+.user-account .meta { margin: 0 0 4px; }
+.user-account form { margin: 8px 0 0; }
+.user-account .toolbar { margin-top: 10px; }
+
 .btn {
     border: 1px solid var(--line);
     background: var(--raise-2);

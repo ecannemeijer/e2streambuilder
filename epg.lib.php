@@ -368,6 +368,36 @@ function epgMigrate(PDO $db): void
         $db->exec('CREATE INDEX IF NOT EXISTS auth_attempts_lookup ON auth_attempts(address, action, failed_at)');
         $db->exec('INSERT INTO epg_schema (version) VALUES (8)');
     }
+    if ($version < 9) {
+        $cols = [];
+        foreach ($db->query('PRAGMA table_info(users)') as $info) {
+            $cols[(string) $info['name']] = true;
+        }
+        if (!isset($cols['registered_ip'])) {
+            $db->exec("ALTER TABLE users ADD COLUMN registered_ip TEXT NOT NULL DEFAULT ''");
+        }
+        if (!isset($cols['last_login_at'])) {
+            $db->exec('ALTER TABLE users ADD COLUMN last_login_at TEXT');
+        }
+        if (!isset($cols['last_login_ip'])) {
+            $db->exec("ALTER TABLE users ADD COLUMN last_login_ip TEXT NOT NULL DEFAULT ''");
+        }
+        if (!isset($cols['failed_logins'])) {
+            $db->exec('ALTER TABLE users ADD COLUMN failed_logins INTEGER NOT NULL DEFAULT 0');
+        }
+        if (!isset($cols['locked_at'])) {
+            $db->exec('ALTER TABLE users ADD COLUMN locked_at TEXT');
+        }
+        $db->exec('CREATE TABLE IF NOT EXISTS password_resets (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            token_hash TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )');
+        $db->exec('CREATE INDEX IF NOT EXISTS password_resets_user ON password_resets(user_id)');
+        $db->exec('INSERT INTO epg_schema (version) VALUES (9)');
+    }
     epgSeedSources();
 }
 
@@ -627,33 +657,35 @@ function authCsrfCheck(): void
     }
 }
 
-function authFail(string $dialog, string $message, string $username = ''): void
+function authFail(string $dialog, string $message, string $username = '', bool $ok = false): void
 {
     authStart();
     $_SESSION['auth_flash'] = [
         'dialog' => $dialog,
         'message' => $message,
         'username' => trim($username),
+        'ok' => $ok,
     ];
     session_write_close();
     header('Location: index.php');
     exit;
 }
 
-/** @return array{dialog: string, message: string, username: string} */
+/** @return array{dialog: string, message: string, username: string, ok: bool} */
 function authFlashTake(): array
 {
     authStart();
     $flash = $_SESSION['auth_flash'] ?? null;
     unset($_SESSION['auth_flash']);
     if (!is_array($flash)) {
-        return ['dialog' => '', 'message' => '', 'username' => ''];
+        return ['dialog' => '', 'message' => '', 'username' => '', 'ok' => false];
     }
 
     return [
         'dialog' => (string) ($flash['dialog'] ?? ''),
         'message' => (string) ($flash['message'] ?? ''),
         'username' => (string) ($flash['username'] ?? ''),
+        'ok' => !empty($flash['ok']),
     ];
 }
 
@@ -767,20 +799,33 @@ function authRequireAdmin(): void
     }
 }
 
-/** @return list<array{id: int, username: string, role: string, created_at: string}> */
+/** @return list<array{id: int, username: string, role: string, created_at: string, registered_ip: string, last_login_at: string, last_login_ip: string, failed_logins: int, locked_at: string}> */
 function authUserList(): array
 {
     $rows = [];
-    foreach (epgDb()->query('SELECT id, username, role, created_at FROM users ORDER BY username COLLATE NOCASE ASC') as $row) {
+    foreach (epgDb()->query('SELECT id, username, role, created_at, registered_ip, last_login_at, last_login_ip, failed_logins, locked_at FROM users ORDER BY username COLLATE NOCASE ASC') as $row) {
         $rows[] = [
             'id' => (int) $row['id'],
             'username' => (string) $row['username'],
             'role' => (string) $row['role'] === 'admin' ? 'admin' : 'user',
             'created_at' => (string) $row['created_at'],
+            'registered_ip' => (string) ($row['registered_ip'] ?? ''),
+            'last_login_at' => (string) ($row['last_login_at'] ?? ''),
+            'last_login_ip' => (string) ($row['last_login_ip'] ?? ''),
+            'failed_logins' => (int) ($row['failed_logins'] ?? 0),
+            'locked_at' => (string) ($row['locked_at'] ?? ''),
         ];
     }
 
     return $rows;
+}
+
+function authClearLock(int $userId): void
+{
+    if ($userId < 1) {
+        return;
+    }
+    epgDb()->prepare('UPDATE users SET failed_logins = 0, locked_at = NULL WHERE id = ?')->execute([$userId]);
 }
 
 function authChangePassword(int $userId, string $current, string $next): void
@@ -843,7 +888,7 @@ function authUpdateUser(int $id, string $username, string $password, string $rol
     if ($password === '') {
         $db->prepare('UPDATE users SET username = ?, role = ? WHERE id = ?')->execute([$username, $role, $id]);
     } else {
-        $db->prepare('UPDATE users SET username = ?, role = ?, password_hash = ? WHERE id = ?')
+        $db->prepare('UPDATE users SET username = ?, role = ?, password_hash = ?, failed_logins = 0, locked_at = NULL WHERE id = ?')
             ->execute([$username, $role, password_hash($password, PASSWORD_DEFAULT), $id]);
     }
 }
@@ -871,6 +916,7 @@ function authDeleteUser(int $id): void
     foreach ($homes as $home) {
         homeDelete((string) $home['token'], $id);
     }
+    $db->prepare('DELETE FROM password_resets WHERE user_id = ?')->execute([$id]);
     $db->prepare('DELETE FROM users WHERE id = ?')->execute([$id]);
 }
 
@@ -909,8 +955,10 @@ function authRegisterAccount(string $username, string $password): array
         $admins = (int) $db->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")->fetchColumn();
         $adminEmail = envValue('ADMIN_EMAIL');
         $role = ($admins === 0 && $adminEmail !== '' && strcasecmp($username, $adminEmail) === 0) ? 'admin' : 'user';
-        $db->prepare('INSERT INTO users (username, password_hash, created_at, role) VALUES (?, ?, ?, ?)')
-            ->execute([$username, password_hash($password, PASSWORD_DEFAULT), epgNow(), $role]);
+        $now = epgNow();
+        $ip = authClientAddress();
+        $db->prepare('INSERT INTO users (username, password_hash, created_at, role, registered_ip, last_login_at, last_login_ip) VALUES (?, ?, ?, ?, ?, ?, ?)')
+            ->execute([$username, password_hash($password, PASSWORD_DEFAULT), $now, $role, $ip, $now, $ip]);
         $id = (int) $db->lastInsertId();
         if ($id < 1) {
             throw new RuntimeException('The account could not be saved.');
@@ -945,6 +993,13 @@ function authRegisterAccount(string $username, string $password): array
 
 function authClientAddress(): string
 {
+    $forwarded = (string) ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? '');
+    if ($forwarded !== '') {
+        $first = trim(explode(',', $forwarded)[0]);
+        if (filter_var($first, FILTER_VALIDATE_IP)) {
+            return $first;
+        }
+    }
     $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
 
     return filter_var($ip, FILTER_VALIDATE_IP) ? $ip : '0.0.0.0';
@@ -972,14 +1027,31 @@ function authLogin(string $username, string $password): array
 {
     authThrottleGate('login');
     $username = trim($username);
-    $stmt = epgDb()->prepare('SELECT id, password_hash FROM users WHERE username = ? COLLATE NOCASE');
+    $stmt = epgDb()->prepare('SELECT id, password_hash, locked_at, failed_logins FROM users WHERE username = ? COLLATE NOCASE');
     $stmt->execute([$username]);
     $row = $stmt->fetch();
-    $hash = is_array($row) ? (string) $row['password_hash'] : '';
-    if ($hash === '' || !password_verify($password, $hash)) {
+    if (!is_array($row)) {
         authThrottleNote('login');
         throw new InvalidArgumentException('The username or password is wrong. Create an account first if you do not have one.');
     }
+    if (trim((string) ($row['locked_at'] ?? '')) !== '') {
+        authThrottleNote('login');
+        throw new InvalidArgumentException('This account is blocked. An admin can unblock it.');
+    }
+    $hash = (string) $row['password_hash'];
+    if ($hash === '' || !password_verify($password, $hash)) {
+        authThrottleNote('login');
+        $fails = (int) ($row['failed_logins'] ?? 0) + 1;
+        if ($fails >= 5) {
+            epgDb()->prepare('UPDATE users SET failed_logins = ?, locked_at = ? WHERE id = ?')
+                ->execute([$fails, epgNow(), (int) $row['id']]);
+            throw new InvalidArgumentException('This account is blocked. An admin can unblock it.');
+        }
+        epgDb()->prepare('UPDATE users SET failed_logins = ? WHERE id = ?')->execute([$fails, (int) $row['id']]);
+        throw new InvalidArgumentException('The username or password is wrong. Create an account first if you do not have one.');
+    }
+    epgDb()->prepare('UPDATE users SET failed_logins = 0, locked_at = NULL, last_login_at = ?, last_login_ip = ? WHERE id = ?')
+        ->execute([epgNow(), authClientAddress(), (int) $row['id']]);
     authRemember((int) $row['id']);
     $user = authUser();
     if ($user === null) {
@@ -987,6 +1059,60 @@ function authLogin(string $username, string $password): array
     }
 
     return $user;
+}
+
+function authRequestPasswordReset(string $email): void
+{
+    authThrottleGate('reset');
+    authThrottleNote('reset');
+    $email = trim($email);
+    if (!authEmailOk($email)) {
+        return;
+    }
+    $stmt = epgDb()->prepare('SELECT id FROM users WHERE username = ? COLLATE NOCASE');
+    $stmt->execute([$email]);
+    $id = (int) $stmt->fetchColumn();
+    if ($id < 1) {
+        return;
+    }
+    $token = bin2hex(random_bytes(32));
+    $db = epgDb();
+    $db->prepare('DELETE FROM password_resets WHERE user_id = ? OR expires_at < ?')->execute([$id, epgNow()]);
+    $db->prepare('INSERT INTO password_resets (user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)')
+        ->execute([$id, hash('sha256', $token), date('Y-m-d H:i:s', time() + 3600), epgNow()]);
+    $link = appBaseUrl() . '/reset.php?token=' . rawurlencode($token);
+    try {
+        authSendMail(
+            $email,
+            'Reset your password',
+            "A password reset was requested.\n\nOpen this link within one hour:\n" . $link . "\n\nIf you did not ask for this, you can ignore this message.\n"
+        );
+    } catch (Throwable $e) {
+        error_log('e2sb: ' . $e->getMessage());
+    }
+}
+
+function authResetPassword(string $token, string $password): void
+{
+    if (strlen($password) < 8 || strlen($password) > 200) {
+        throw new InvalidArgumentException('Use a password of at least 8 characters.');
+    }
+    if (preg_match('/^[a-f0-9]{64}$/', $token) !== 1) {
+        throw new InvalidArgumentException('This link has expired. Request a new one from the login page.');
+    }
+    $db = epgDb();
+    $stmt = $db->prepare('SELECT id, user_id, expires_at FROM password_resets WHERE token_hash = ?');
+    $stmt->execute([hash('sha256', $token)]);
+    $row = $stmt->fetch();
+    if (!is_array($row) || strtotime((string) $row['expires_at']) < time()) {
+        if (is_array($row)) {
+            $db->prepare('DELETE FROM password_resets WHERE id = ?')->execute([(int) $row['id']]);
+        }
+        throw new InvalidArgumentException('This link has expired. Request a new one from the login page.');
+    }
+    $db->prepare('UPDATE users SET password_hash = ?, failed_logins = 0, locked_at = NULL WHERE id = ?')
+        ->execute([password_hash($password, PASSWORD_DEFAULT), (int) $row['user_id']]);
+    $db->prepare('DELETE FROM password_resets WHERE user_id = ?')->execute([(int) $row['user_id']]);
 }
 
 function authLogout(): void
