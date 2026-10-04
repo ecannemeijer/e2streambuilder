@@ -1027,28 +1027,33 @@ function authLogin(string $username, string $password): array
 {
     authThrottleGate('login');
     $username = trim($username);
-    $stmt = epgDb()->prepare('SELECT id, password_hash, locked_at, failed_logins FROM users WHERE username = ? COLLATE NOCASE');
+    $stmt = epgDb()->prepare('SELECT id, password_hash, role, locked_at, failed_logins FROM users WHERE username = ? COLLATE NOCASE');
     $stmt->execute([$username]);
     $row = $stmt->fetch();
     if (!is_array($row)) {
         authThrottleNote('login');
-        throw new InvalidArgumentException('The username or password is wrong. Create an account first if you do not have one.');
+        throw new InvalidArgumentException('Wrong password.');
     }
     if (trim((string) ($row['locked_at'] ?? '')) !== '') {
-        authThrottleNote('login');
-        throw new InvalidArgumentException('This account is blocked. An admin can unblock it.');
+        throw new InvalidArgumentException('This account is blocked after 5 wrong passwords. An admin can unblock it on the Users page.');
     }
     $hash = (string) $row['password_hash'];
     if ($hash === '' || !password_verify($password, $hash)) {
         authThrottleNote('login');
         $fails = (int) ($row['failed_logins'] ?? 0) + 1;
-        if ($fails >= 5) {
+        $admins = (int) epgDb()->query("SELECT COUNT(*) FROM users WHERE role = 'admin' AND (locked_at IS NULL OR locked_at = '')")->fetchColumn();
+        $lastAdmin = (string) ($row['role'] ?? '') === 'admin' && $admins < 2;
+        if ($fails >= 5 && !$lastAdmin) {
             epgDb()->prepare('UPDATE users SET failed_logins = ?, locked_at = ? WHERE id = ?')
                 ->execute([$fails, epgNow(), (int) $row['id']]);
-            throw new InvalidArgumentException('This account is blocked. An admin can unblock it.');
+            throw new InvalidArgumentException('This account is blocked after 5 wrong passwords. An admin can unblock it on the Users page.');
+        }
+        if ($lastAdmin) {
+            $fails = min($fails, 4);
         }
         epgDb()->prepare('UPDATE users SET failed_logins = ? WHERE id = ?')->execute([$fails, (int) $row['id']]);
-        throw new InvalidArgumentException('The username or password is wrong. Create an account first if you do not have one.');
+        $left = 5 - $fails;
+        throw new InvalidArgumentException('Wrong password. ' . $left . ' attempt' . ($left === 1 ? '' : 's') . ' left before this account is blocked.');
     }
     epgDb()->prepare('UPDATE users SET failed_logins = 0, locked_at = NULL, last_login_at = ?, last_login_ip = ? WHERE id = ?')
         ->execute([epgNow(), authClientAddress(), (int) $row['id']]);

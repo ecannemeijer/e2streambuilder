@@ -69,6 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
         exit;
     } catch (InvalidArgumentException $e) {
         authFail('login', $e->getMessage(), (string) ($_POST['username'] ?? ''));
+    } catch (Throwable $e) {
+        authFail('login', authHiddenError($e), (string) ($_POST['username'] ?? ''));
     }
 }
 
