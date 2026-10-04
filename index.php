@@ -278,7 +278,7 @@ if ($activeHouse === '' && $homes !== []) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=29">
+    <link rel="stylesheet" href="assets/app.css?v=30">
     <?php appShellStyle(); ?>
 </head>
 <body>
@@ -445,6 +445,9 @@ if ($activeHouse === '' && $homes !== []) {
     <?php appMenubar('playlist', $activeHouse); ?>
 
     <div class="housebars">
+        <?php if (isset($_GET['removed'])): ?>
+            <p class="flash ok" role="status">The account was removed. Its houses, playlists, and guides were removed too.</p>
+        <?php endif; ?>
         <?php if ($authBlocked): ?>
             <section class="login-alert">
                 <h2>Account blocked</h2>
@@ -772,6 +775,7 @@ if ($activeHouse === '' && $homes !== []) {
         <?php endforeach; ?>
     </div>
     <?php endif; ?>
+    <?php appFooter(); ?>
 </div>
 <script>
 (function () {

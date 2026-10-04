@@ -65,7 +65,7 @@ $eitError = epgStateGet('eit_error') ?? '';
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>EIT · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=29">
+    <link rel="stylesheet" href="assets/app.css?v=30">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">
@@ -107,6 +107,7 @@ $eitError = epgStateGet('eit_error') ?? '';
             <button class="btn primary" name="action" value="build_eit">Build EIT guide</button>
         </form>
     </section>
+<?php appFooter(); ?>
 </div>
 <script src="assets/epg.js?v=3"></script>
 </body>

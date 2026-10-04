@@ -15,6 +15,21 @@ if ($home === null) {
     exit;
 }
 
+if (isset($_GET['download'])) {
+    $path = homePlaylistPath($token);
+    $file = is_file($path) ? file_get_contents($path) : false;
+    if (!is_string($file) || $file === '') {
+        header('Location: playlist-edit.php?house=' . rawurlencode($token));
+        exit;
+    }
+    $slug = (string) ($home['slug'] ?? 'playlist');
+    header('Content-Type: application/vnd.apple.mpegurl; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $slug . '.m3u8"');
+    header('Content-Length: ' . strlen($file));
+    echo $file;
+    exit;
+}
+
 $error = null;
 $progress = $_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['progress'] ?? '') === '1';
 $back = 'playlist-edit.php?house=' . rawurlencode($token);
@@ -78,7 +93,7 @@ if (is_string($body) && $body !== '') {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Edit playlist · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=29">
+    <link rel="stylesheet" href="assets/app.css?v=30">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">
@@ -111,6 +126,7 @@ if (is_string($body) && $body !== '') {
                 <button class="btn" type="button" id="channel-find">Search</button>
                 <p class="hint" id="channel-find-note" hidden>No channel with that name.</p>
                 <button class="btn primary" type="submit">Save playlist</button>
+                <a class="btn" href="playlist-edit.php?house=<?= h($token) ?>&amp;download=1">Download playlist</a>
             </div>
             <div class="edit-layout">
                 <div class="edit-col" id="edit-categories"></div>
@@ -285,6 +301,7 @@ if (is_string($body) && $body !== '') {
             </div>
         </div>
     <?php endif; ?>
+    <?php appFooter(); ?>
 </div>
 </body>
 </html>

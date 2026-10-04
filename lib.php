@@ -71,13 +71,25 @@ function appNav(string $active): void
         echo '<option value="' . h($value) . '">' . h($label) . '</option>';
     }
     echo '</select></label>';
+    if (function_exists('authUser') && authUser() !== null) {
+        $settingsClass = $active === 'settings' ? ' class="active"' : '';
+        echo '<a' . $settingsClass . ' href="settings.php">Settings</a>';
+    }
     echo '<button class="btn" type="button" id="contact-open">Contact</button>';
     echo '<button class="btn" type="button" id="help-open">How it works</button>';
-    $version = appVersion();
-    if ($version !== '') {
-        echo '<span class="version">' . h($version) . '</span>';
-    }
     echo '</nav>';
+}
+
+function appFooter(): void
+{
+    $version = appVersion();
+    echo '<footer class="site-foot">';
+    echo '<span>© ' . date('Y') . ' E. Cannemeijer</span>';
+    echo '<span>E2 Stream Builder</span>';
+    if ($version !== '') {
+        echo '<span>' . h($version) . '</span>';
+    }
+    echo '</footer>';
 }
 
 function appMenubar(string $active, string $activeHouse = ''): void
@@ -118,7 +130,6 @@ function appMenubar(string $active, string $activeHouse = ''): void
         echo '<button class="nav-btn" type="submit">Remove house</button>';
         echo '</form>';
     }
-    echo '<button class="nav-btn" type="button" id="password-open">Password</button>';
     echo '<form method="post" action="index.php">';
     echo authCsrfField();
     echo '<input type="hidden" name="logout" value="1">';
@@ -147,7 +158,7 @@ function appFlash(): void
 function appReturnPath(): string
 {
     $script = basename((string) ($_SERVER['SCRIPT_NAME'] ?? 'index.php'));
-    $allowed = ['index.php', 'epg.php', 'epg-mapping.php', 'users.php', 'eit.php', 'playlist-edit.php', 'reset.php'];
+    $allowed = ['index.php', 'epg.php', 'epg-mapping.php', 'users.php', 'eit.php', 'playlist-edit.php', 'reset.php', 'settings.php'];
     if (!in_array($script, $allowed, true)) {
         return 'index.php';
     }
@@ -165,7 +176,7 @@ function appReturnPath(): string
 function appSafeReturn(string $return): string
 {
     $return = str_replace(["\r", "\n"], '', $return);
-    if (preg_match('/^(index|epg|epg-mapping|users|eit|reset)\.php$/', $return) === 1) {
+    if (preg_match('/^(index|epg|epg-mapping|users|eit|reset|settings)\.php$/', $return) === 1) {
         return $return === 'reset.php' ? 'index.php' : $return;
     }
     if (preg_match('/^playlist-edit\.php\?house=([a-f0-9]{32})$/', $return, $match) === 1 && homeTokenOk($match[1])) {

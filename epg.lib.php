@@ -1017,6 +1017,21 @@ function authChangePassword(int $userId, string $current, string $next): void
         ->execute([password_hash($next, PASSWORD_DEFAULT), $userId]);
     authStart();
     session_regenerate_id(true);
+    $email = epgDb()->prepare('SELECT username FROM users WHERE id = ?');
+    $email->execute([$userId]);
+    $username = (string) $email->fetchColumn();
+    if (authEmailOk($username)) {
+        try {
+            authSendMail(
+                $username,
+                'Your password was changed',
+                "The password for this account was changed.\n\nIf you did not do this, use Forgot password on the login page.\n"
+            );
+        } catch (Throwable $e) {
+            error_log('e2sb: ' . $e->getMessage());
+            throw new InvalidArgumentException('The password was saved, but the email could not be sent.');
+        }
+    }
 }
 
 function authUpdateUser(int $id, string $username, string $password, string $role): void

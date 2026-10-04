@@ -84,7 +84,7 @@ $users = authUserList();
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Users · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=29">
+    <link rel="stylesheet" href="assets/app.css?v=30">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">
@@ -199,6 +199,7 @@ $users = authUserList();
             </table>
         </div>
     </section>
+    <?php appFooter(); ?>
 </div>
 </body>
 </html>

@@ -94,7 +94,7 @@ body.scroll .menubar {
 .brand.compact .mark { width: 28px; height: 28px; flex: none; }
 .brand.compact strong { font-size: 0.95rem; white-space: nowrap; }
 
-.menubar .nav { flex: 1; }
+.menubar .nav { flex: 0 1 auto; }
 .menubar > form { display: contents; margin: 0; }
 .menubar .nav-btn {
     color: var(--muted);
@@ -687,7 +687,25 @@ video {
     border-radius: 999px;
     padding: 6px 12px;
 }
-.nav .theme { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.85rem; }
+.nav .theme { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.85rem; }
+
+.site-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+
+.checkline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text);
+}
 .nav select {
     background: var(--raise);
     color: var(--text);

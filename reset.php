@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>New password · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=29">
+    <link rel="stylesheet" href="assets/app.css?v=30">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">
@@ -65,6 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </form>
         <?php endif; ?>
     </section>
+    <?php appFooter(); ?>
 </div>
 <script src="assets/app.js?v=8"></script>
 </body>

@@ -102,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>EPG · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=29">
+    <link rel="stylesheet" href="assets/app.css?v=30">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">
@@ -234,6 +234,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             <pre class="log"><?= h($log) ?></pre>
         </section>
     <?php endif; ?>
+<?php appFooter(); ?>
 </div>
 <script src="assets/epg.js?v=3"></script>
 </body>
