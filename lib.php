@@ -65,7 +65,7 @@ function appFooter(): void
 {
     $version = appVersion();
     echo '<footer class="site-foot">';
-    echo '<span>© ' . date('Y') . ' E. Cannemeijer</span>';
+    echo '<span>© ' . date('Y') . ' musemandate</span>';
     echo '<span>E2 Stream Builder</span>';
     if ($version !== '') {
         echo '<span>' . h($version) . '</span>';
