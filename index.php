@@ -172,7 +172,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_house'])) {
             throw new InvalidArgumentException('Log in to change this house.');
         }
         homeSetStreamPort($houseErrorToken, $account['id'], (int) ($_POST['stream_port'] ?? 0));
-        homeRename($houseErrorToken, $account['id'], (string) ($_POST['house_name'] ?? ''));
         header('Location: index.php?house=' . rawurlencode($houseErrorToken) . '&house_saved=1');
         exit;
     } catch (InvalidArgumentException $e) {
@@ -727,9 +726,6 @@ if ($activeHouse === '' && $homes !== []) {
                             <?= authCsrfField() ?>
                             <input type="hidden" name="update_house" value="1">
                             <input type="hidden" name="token" value="<?= h($token) ?>">
-                            <label class="field"><span>House name</span>
-                                <input name="house_name" maxlength="80" value="<?= h((string) $house['name']) ?>" required>
-                            </label>
                             <label class="field port"><span>Stream port</span>
                                 <input name="stream_port" type="number" min="1" max="65535" value="<?= (int) $house['stream_port'] ?>" required>
                             </label>
@@ -737,7 +733,7 @@ if ($activeHouse === '' && $homes !== []) {
                             <?php if ($channelCount !== null): ?>
                                 <a class="btn" href="playlist-edit.php?house=<?= h($token) ?>">Edit m3u8</a>
                             <?php endif; ?>
-                            <p class="hint">The playlist address stays the same when you rename the house. A new stream port is used the next time you publish.</p>
+                            <p class="hint">A new stream port is used the next time you publish.</p>
                         </form>
                     </section>
                     <section class="user-card">
