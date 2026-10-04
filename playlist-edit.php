@@ -114,7 +114,7 @@ if (is_string($body) && $body !== '') {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Edit playlist · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=33">
+    <link rel="stylesheet" href="assets/app.css?v=34">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">
@@ -155,6 +155,23 @@ if (is_string($body) && $body !== '') {
                 <div class="edit-col" id="edit-channels"></div>
             </div>
         </form>
+        <div id="leave-guard">
+            <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="leave-title">
+                <h2 id="leave-title">Save the playlist?</h2>
+                <p>This playlist has changes. Save them before leaving this page?</p>
+                <div class="actions">
+                    <button class="btn primary" type="button" id="leave-save">Save</button>
+                    <button class="btn" type="button" data-close>Cancel</button>
+                </div>
+            </div>
+        </div>
+        <div id="search-results">
+            <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="search-title">
+                <h2 id="search-title">Channels</h2>
+                <div id="search-list"></div>
+                <button class="btn" type="button" data-close>Close</button>
+            </div>
+        </div>
         <script type="application/json" id="edit-data"><?= json_encode($groups, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?></script>
         <script>
         (function () {
@@ -206,6 +223,50 @@ if (is_string($body) && $body !== '') {
                 return next;
             }
 
+            var drag = null;
+
+            function reorder(list, from, to) {
+                if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return;
+                var item = list.splice(from, 1)[0];
+                if (from < to) to -= 1;
+                list.splice(to, 0, item);
+            }
+
+            function bindDrag(row, kind, index, list, onDrop) {
+                row.draggable = true;
+                row.addEventListener("dragstart", function (event) {
+                    if (event.target.closest("input, button, a")) {
+                        event.preventDefault();
+                        return;
+                    }
+                    drag = {kind: kind, index: index};
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", kind);
+                    row.classList.add("is-dragging");
+                });
+                row.addEventListener("dragend", function () {
+                    row.classList.remove("is-dragging");
+                    drag = null;
+                });
+                row.addEventListener("dragover", function (event) {
+                    if (!drag || drag.kind !== kind) return;
+                    event.preventDefault();
+                    row.classList.add("is-drop");
+                });
+                row.addEventListener("dragleave", function () {
+                    row.classList.remove("is-drop");
+                });
+                row.addEventListener("drop", function (event) {
+                    if (!drag || drag.kind !== kind) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    var from = drag.index;
+                    drag = null;
+                    reorder(list, from, index);
+                    onDrop();
+                });
+            }
+
             function moveButtons(index, length, onMove) {
                 var wrap = document.createElement("span");
                 wrap.className = "edit-move";
@@ -241,6 +302,11 @@ if (is_string($body) && $body !== '') {
                 groups.forEach(function (group, index) {
                     var row = document.createElement("div");
                     row.className = "edit-row" + (index === active ? " is-active" : "");
+                    var grip = document.createElement("span");
+                    grip.className = "edit-grip";
+                    grip.textContent = "⋮⋮";
+                    grip.title = "Drag";
+                    row.appendChild(grip);
                     var box = document.createElement("input");
                     box.type = "checkbox";
                     box.setAttribute("aria-label", "Include " + group.name);
@@ -277,6 +343,11 @@ if (is_string($body) && $body !== '') {
                         active = index;
                         render();
                     });
+                    bindDrag(row, "group", index, groups, function () {
+                        var current = group;
+                        active = Math.max(0, groups.indexOf(current));
+                        render();
+                    });
                     categories.appendChild(row);
                 });
                 channelBox.innerHTML = "";
@@ -289,6 +360,11 @@ if (is_string($body) && $body !== '') {
                     var row = document.createElement("div");
                     row.className = "edit-row";
                     row.setAttribute("data-channel", String(index));
+                    var grip = document.createElement("span");
+                    grip.className = "edit-grip";
+                    grip.textContent = "⋮⋮";
+                    grip.title = "Drag";
+                    row.appendChild(grip);
                     var box = document.createElement("input");
                     box.type = "checkbox";
                     box.checked = channel.on;
@@ -304,6 +380,7 @@ if (is_string($body) && $body !== '') {
                         if (moveItem(group.channels, index, delta) < 0) return;
                         render();
                     }));
+                    bindDrag(row, "channel", index, group.channels, function () { render(); });
                     channelBox.appendChild(row);
                 });
                 mark();
@@ -500,23 +577,6 @@ if (is_string($body) && $body !== '') {
             render();
         })();
         </script>
-        <div id="leave-guard">
-            <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="leave-title">
-                <h2 id="leave-title">Save the playlist?</h2>
-                <p>This playlist has changes. Save them before leaving this page?</p>
-                <div class="actions">
-                    <button class="btn primary" type="button" id="leave-save">Save</button>
-                    <button class="btn" type="button" data-close>Cancel</button>
-                </div>
-            </div>
-        </div>
-        <div id="search-results">
-            <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="search-title">
-                <h2 id="search-title">Channels</h2>
-                <div id="search-list"></div>
-                <button class="btn" type="button" data-close>Close</button>
-            </div>
-        </div>
     <?php endif; ?>
     <?php appFooter(); ?>
 </div>

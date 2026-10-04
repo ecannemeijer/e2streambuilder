@@ -290,8 +290,20 @@ body.scroll .menubar {
     gap: 8px;
     padding: 6px 8px;
     border-radius: 10px;
+    cursor: grab;
 }
+.edit-grip {
+    color: var(--muted);
+    cursor: grab;
+    user-select: none;
+    letter-spacing: -0.12em;
+    padding: 2px 4px;
+}
+.edit-row input { cursor: text; }
+.edit-row button { cursor: pointer; }
 .edit-row.is-active { background: var(--raise-2); }
+.edit-row.is-dragging { opacity: 0.45; }
+.edit-row.is-drop { outline: 2px dashed var(--accent); }
 .edit-row.is-hit,
 .edit-row:focus { outline: 2px solid var(--accent); }
 
