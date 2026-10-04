@@ -48,6 +48,8 @@ TiviMate attaches programmes with `tvg-id`.
 
 ## Admin
 
+Copy `.env.example` to `.env` on the server. `APP_VERSION` is the number shown in the menu. Set `ADMIN_EMAIL` to the address that should be the admin while the site has no admin yet. Register or log in with that address and the account becomes admin. `MAIL_FROM` is the sender for welcome and playlist mail. Leave receiver addresses and `public_base` in `data/settings.json`. `.env` is not committed.
+
 An admin also has the shared receiver tools. Enter the receiver, WebIF port, and stream port next to the house and save. The Playlist page can then read the bouquets directly and offers three live lists:
 
 - All channels: `channels.m3u8`

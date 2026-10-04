@@ -2,7 +2,12 @@
 
 function appVersion(): string
 {
-    return '1.0.0-beta';
+    $version = envValue('APP_VERSION');
+    if ($version === '' || strlen($version) > 40 || preg_match('/^[A-Za-z0-9][A-Za-z0-9._+-]*$/', $version) !== 1) {
+        return '';
+    }
+
+    return $version;
 }
 
 function defaultReceiverSettings(): array
@@ -176,3 +181,56 @@ function resetReceiverSettingsCache(): void
 {
     // Settings are read once per request. A fresh request sees the saved file.
 }
+
+function loadEnvFile(): void
+{
+    static $loaded = false;
+    if ($loaded) {
+        return;
+    }
+    $loaded = true;
+    $path = __DIR__ . '/.env';
+    if (!is_file($path)) {
+        return;
+    }
+    $lines = file($path, FILE_IGNORE_NEW_LINES);
+    if ($lines === false) {
+        return;
+    }
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '' || str_starts_with($line, '#')) {
+            continue;
+        }
+        $eq = strpos($line, '=');
+        if ($eq === false) {
+            continue;
+        }
+        $key = trim(substr($line, 0, $eq));
+        $value = trim(substr($line, $eq + 1));
+        if ($key === '' || getenv($key) !== false) {
+            continue;
+        }
+        if (
+            (str_starts_with($value, '"') && str_ends_with($value, '"'))
+            || (str_starts_with($value, "'") && str_ends_with($value, "'"))
+        ) {
+            $value = substr($value, 1, -1);
+        }
+        putenv($key . '=' . $value);
+        $_ENV[$key] = $value;
+    }
+}
+
+function envValue(string $key, string $default = ''): string
+{
+    loadEnvFile();
+    $value = $_ENV[$key] ?? getenv($key);
+    if (!is_string($value) || trim($value) === '') {
+        return $default;
+    }
+
+    return trim($value);
+}
+
+loadEnvFile();

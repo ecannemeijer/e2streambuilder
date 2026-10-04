@@ -256,7 +256,7 @@ if ($activeHouse === '' && $homes !== []) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=23">
+    <link rel="stylesheet" href="assets/app.css?v=24">
     <?php appShellStyle(); ?>
 </head>
 <body>
@@ -689,19 +689,20 @@ if ($activeHouse === '' && $homes !== []) {
                             <div class="house-link">
                                 <span>Guide</span>
                                 <p class="url slim" title="<?= h($guideUrl) ?>"><?= h($guideUrl) ?></p>
-                                <button class="btn" type="button" data-copy="<?= h($guideUrl) ?>">Copy</button>
+                                <span class="link-actions">
+                                    <button class="btn" type="button" data-copy="<?= h($guideUrl) ?>">Copy</button>
+                                    <form method="post" action="index.php">
+                                        <?= authCsrfField() ?>
+                                        <input type="hidden" name="resend_links" value="1">
+                                        <input type="hidden" name="token" value="<?= h($token) ?>">
+                                        <button class="btn" type="submit">Email these links</button>
+                                    </form>
+                                </span>
                             </div>
                         </div>
-                        <form method="post" action="index.php">
-                            <?= authCsrfField() ?>
-                            <input type="hidden" name="resend_links" value="1">
-                            <input type="hidden" name="token" value="<?= h($token) ?>">
-                            <button class="btn" type="submit">Email these links</button>
-                        </form>
                     </section>
                     <section class="user-card">
                         <h2>This house</h2>
-                        <p>The playlist address stays the same when you rename the house. A new stream port is used the next time you publish.</p>
                         <?php if ($houseError !== null && $houseErrorToken === $token): ?>
                             <p class="error"><?= h($houseError) ?></p>
                         <?php endif; ?>
@@ -716,6 +717,7 @@ if ($activeHouse === '' && $homes !== []) {
                                 <input name="stream_port" type="number" min="1" max="65535" value="<?= (int) $house['stream_port'] ?>" required>
                             </label>
                             <button class="btn" type="submit">Save</button>
+                            <p class="hint">The playlist address stays the same when you rename the house. A new stream port is used the next time you publish.</p>
                         </form>
                     </section>
                     <section class="user-card">

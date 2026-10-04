@@ -1,3 +1,6 @@
+# Server-only settings. Copy .env.example to .env.
+.env
+
 # Receiver settings, downloaded EPG files, the generated guide, logs, and SQLite.
 /data/*
 !/data/.htaccess

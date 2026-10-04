@@ -677,7 +677,10 @@ function authSendMail(string $to, string $subject, string $body): void
     if (!authEmailOk($to)) {
         throw new RuntimeException('This account has no email address.');
     }
-    $fromEmail = 'no-reply@homearchive.nl';
+    $fromEmail = envValue('MAIL_FROM', 'no-reply@homearchive.nl');
+    if (!authEmailOk($fromEmail)) {
+        $fromEmail = 'no-reply@homearchive.nl';
+    }
     $headers = implode("\r\n", [
         'MIME-Version: 1.0',
         'Content-Type: text/plain; charset=UTF-8',
@@ -721,11 +724,30 @@ function authUser(): ?array
         return null;
     }
 
-    return [
+    return authPromoteBootstrapAdmin([
         'id' => (int) $row['id'],
         'username' => (string) $row['username'],
         'role' => (string) $row['role'] === 'admin' ? 'admin' : 'user',
-    ];
+    ]);
+}
+
+function authPromoteBootstrapAdmin(array $user): array
+{
+    if (($user['role'] ?? '') === 'admin') {
+        return $user;
+    }
+    $adminEmail = envValue('ADMIN_EMAIL');
+    if ($adminEmail === '' || strcasecmp((string) $user['username'], $adminEmail) !== 0) {
+        return $user;
+    }
+    $admins = (int) epgDb()->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")->fetchColumn();
+    if ($admins > 0) {
+        return $user;
+    }
+    epgDb()->prepare("UPDATE users SET role = 'admin' WHERE id = ?")->execute([(int) $user['id']]);
+    $user['role'] = 'admin';
+
+    return $user;
 }
 
 function authIsAdmin(?array $user = null): bool
@@ -884,8 +906,11 @@ function authRegisterAccount(string $username, string $password): array
     $db->beginTransaction();
     try {
         $count = (int) $db->query('SELECT COUNT(*) FROM users')->fetchColumn();
+        $admins = (int) $db->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")->fetchColumn();
+        $adminEmail = envValue('ADMIN_EMAIL');
+        $role = ($admins === 0 && $adminEmail !== '' && strcasecmp($username, $adminEmail) === 0) ? 'admin' : 'user';
         $db->prepare('INSERT INTO users (username, password_hash, created_at, role) VALUES (?, ?, ?, ?)')
-            ->execute([$username, password_hash($password, PASSWORD_DEFAULT), epgNow(), 'user']);
+            ->execute([$username, password_hash($password, PASSWORD_DEFAULT), epgNow(), $role]);
         $id = (int) $db->lastInsertId();
         if ($id < 1) {
             throw new RuntimeException('The account could not be saved.');

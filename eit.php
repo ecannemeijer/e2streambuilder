@@ -65,7 +65,7 @@ $eitError = epgStateGet('eit_error') ?? '';
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>EIT · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=23">
+    <link rel="stylesheet" href="assets/app.css?v=24">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">
