@@ -56,6 +56,7 @@ function appNav(string $active): void
     }
     echo '</select></label>';
     echo '<button class="btn" type="button" id="help-open">How it works</button>';
+    echo '<span class="version">' . h(appVersion()) . '</span>';
     echo '</nav>';
 }
 

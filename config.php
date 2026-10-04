@@ -1,5 +1,10 @@
 <?php
 
+function appVersion(): string
+{
+    return '1.0.0-beta';
+}
+
 function defaultReceiverSettings(): array
 {
     return [

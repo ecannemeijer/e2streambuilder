@@ -256,7 +256,7 @@ if ($activeHouse === '' && $homes !== []) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=22">
+    <link rel="stylesheet" href="assets/app.css?v=23">
     <?php appShellStyle(); ?>
 </head>
 <body>

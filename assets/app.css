@@ -537,7 +537,15 @@ video {
 .links li { margin: 6px 0; }
 .links a { color: var(--accent); word-break: break-all; }
 
-.nav { display: flex; flex-wrap: wrap; gap: 8px; }
+.nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.nav .version {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 0.78rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 4px 10px;
+}
 .nav form { display: contents; }
 .nav a {
     color: var(--muted);
