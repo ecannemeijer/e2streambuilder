@@ -566,6 +566,175 @@ function homeDelete(string $token, int $userId): void
     }
 }
 
+function homeForUser(string $token, int $userId): ?array
+{
+    if (!homeTokenOk($token) || $userId < 1) {
+        return null;
+    }
+    $stmt = epgDb()->prepare('SELECT token, name, slug, stream_port, host, created_at, built_at FROM homes WHERE token = ? AND user_id = ?');
+    $stmt->execute([$token, $userId]);
+    $row = $stmt->fetch();
+
+    return is_array($row) ? $row : null;
+}
+
+/**
+ * @return array{header: string, groups: list<array{name: string, channels: list<array{index: int, name: string}>}>}
+ */
+function playlistGroupsFromBody(string $body): array
+{
+    $lines = preg_split("/\r\n|\n|\r/", $body);
+    if ($lines === false) {
+        $lines = [];
+    }
+    $header = [];
+    $groups = [];
+    $order = [];
+    $index = 0;
+    $count = count($lines);
+    for ($i = 0; $i < $count; $i++) {
+        $line = $lines[$i];
+        if (!str_starts_with($line, '#EXTINF:')) {
+            if ($index === 0) {
+                $header[] = $line;
+            }
+            continue;
+        }
+        $url = '';
+        for ($j = $i + 1; $j < $count; $j++) {
+            if (trim($lines[$j]) === '' || str_starts_with($lines[$j], '#')) {
+                continue;
+            }
+            $url = $lines[$j];
+            $i = $j;
+            break;
+        }
+        if ($url === '') {
+            continue;
+        }
+        $group = 'Channels';
+        if (preg_match('/group-title="([^"]*)"/', $line, $match) === 1 && $match[1] !== '') {
+            $group = $match[1];
+        }
+        $name = playlistExtinfTitle($line);
+        if ($name === '') {
+            $name = 'Channel';
+        }
+        if (!isset($groups[$group])) {
+            $groups[$group] = [];
+            $order[] = $group;
+        }
+        $groups[$group][] = ['index' => $index, 'name' => $name];
+        $index++;
+    }
+    $listed = [];
+    foreach ($order as $group) {
+        $listed[] = ['name' => $group, 'channels' => $groups[$group]];
+    }
+
+    return [
+        'header' => rtrim(implode("\n", $header), "\n"),
+        'groups' => $listed,
+    ];
+}
+
+function playlistExtinfTitle(string $line): string
+{
+    $quoted = false;
+    $length = strlen($line);
+    for ($i = 0; $i < $length; $i++) {
+        $char = $line[$i];
+        if ($char === '"') {
+            $quoted = !$quoted;
+            continue;
+        }
+        if ($char === ',' && !$quoted) {
+            return trim(substr($line, $i + 1));
+        }
+    }
+
+    return '';
+}
+
+/**
+ * @param list<int> $keep
+ */
+function homeSavePlaylistSelection(string $token, int $userId, array $keep): void
+{
+    if (homeForUser($token, $userId) === null) {
+        throw new InvalidArgumentException('This house was not found.');
+    }
+    $path = homePlaylistPath($token);
+    $body = is_file($path) ? file_get_contents($path) : false;
+    if (!is_string($body) || $body === '') {
+        throw new InvalidArgumentException('This house has no playlist yet.');
+    }
+    $wanted = [];
+    foreach ($keep as $index) {
+        if (is_int($index) || (is_string($index) && preg_match('/^\d+$/', $index) === 1)) {
+            $wanted[(int) $index] = true;
+        }
+    }
+    $lines = preg_split("/\r\n|\n|\r/", $body);
+    if ($lines === false) {
+        throw new InvalidArgumentException('This house has no playlist yet.');
+    }
+    $header = [];
+    $kept = [];
+    $index = 0;
+    $seen = false;
+    $count = count($lines);
+    for ($i = 0; $i < $count; $i++) {
+        $line = $lines[$i];
+        if (!str_starts_with($line, '#EXTINF:')) {
+            if (!$seen) {
+                $header[] = $line;
+            }
+            continue;
+        }
+        $seen = true;
+        $url = '';
+        for ($j = $i + 1; $j < $count; $j++) {
+            if (trim($lines[$j]) === '' || str_starts_with($lines[$j], '#')) {
+                continue;
+            }
+            $url = $lines[$j];
+            $i = $j;
+            break;
+        }
+        if ($url === '') {
+            continue;
+        }
+        if (isset($wanted[$index])) {
+            $kept[] = $line . "\n" . $url . "\n";
+        }
+        $index++;
+    }
+    if ($kept === []) {
+        throw new InvalidArgumentException('Keep at least one channel.');
+    }
+    $headerText = rtrim(implode("\n", $header), "\n");
+    if ($headerText === '' || !str_starts_with($headerText, '#EXTM3U')) {
+        $headerText = '#EXTM3U';
+    }
+    $next = $headerText . "\n" . implode('', $kept);
+    $tmp = $path . '.tmp';
+    if (file_put_contents($tmp, $next, LOCK_EX) === false) {
+        throw new RuntimeException('The playlist could not be saved.');
+    }
+    if (!rename($tmp, $path)) {
+        @unlink($tmp);
+        throw new RuntimeException('The playlist could not be saved.');
+    }
+    @set_time_limit(0);
+    try {
+        epgGenerateXml(playlistIdsInBody($next), homeEpgXmlPath($token));
+    } catch (Throwable $e) {
+        error_log('e2sb: ' . $e->getMessage());
+        throw new InvalidArgumentException('The playlist was saved, but the guide could not be rebuilt.');
+    }
+}
+
 function homeByToken(string $token): ?array
 {
     if (!homeTokenOk($token)) {

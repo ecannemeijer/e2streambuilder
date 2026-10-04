@@ -26,6 +26,22 @@ function authSecurityHeaders(): void
 
 authSecurityHeaders();
 
+function appThemes(): array
+{
+    return [
+        'dark' => 'Dark',
+        'light' => 'Light',
+        'ocean' => 'Ocean',
+        'amber' => 'Amber',
+        'forest' => 'Forest',
+        'slate' => 'Slate',
+        'rose' => 'Rose',
+        'grape' => 'Grape',
+        'sand' => 'Sand',
+        'midnight' => 'Midnight',
+    ];
+}
+
 function appNav(string $active): void
 {
     $admin = function_exists('authIsAdmin') && authIsAdmin();
@@ -51,7 +67,7 @@ function appNav(string $active): void
         echo '</form>';
     }
     echo '<label class="theme"><span>Theme</span><select id="theme">';
-    foreach (['dark' => 'Dark', 'light' => 'Light', 'ocean' => 'Ocean', 'amber' => 'Amber'] as $value => $label) {
+    foreach (appThemes() as $value => $label) {
         echo '<option value="' . h($value) . '">' . h($label) . '</option>';
     }
     echo '</select></label>';
@@ -112,7 +128,8 @@ function appMenubar(string $active, string $activeHouse = ''): void
 function appThemeScript(): void
 {
     echo '<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">';
-    echo '<script>(function(){try{var t=localStorage.getItem("e2-theme")||"dark";if(t!=="light"&&t!=="ocean"&&t!=="amber")t="dark";document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","dark");}})();</script>';
+    $themeKeys = implode(',', array_keys(appThemes()));
+    echo '<script>(function(){try{var t=localStorage.getItem("e2-theme")||"dark";if(",' . $themeKeys . ',".indexOf(","+t+",")<0)t="dark";document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","dark");}})();</script>';
 }
 
 function appShellStyle(): void
@@ -135,6 +152,12 @@ function appShellStyle(): void
 html[data-theme="light"]{color-scheme:light;--bg:#f4f1ea !important;--raise:#fffdf8 !important;--raise-2:#efe8dc !important;--line:#d7cec0 !important;--text:#241c14 !important;--muted:#6d645b !important;--accent:#b86a1d !important;--accent-ink:#fff8ef !important;--accent-line:#8d4e12 !important;--good:#2f7d46 !important;--warn:#a15c12 !important;--bad:#b42318 !important;--sat:#3d5a73 !important;--stage:#1c1916 !important;--shadow:0 18px 40px rgba(70,48,20,.12) !important}
 html[data-theme="ocean"]{color-scheme:dark;--bg:#0d1720 !important;--raise:#142230 !important;--raise-2:#1b2d3e !important;--line:#2c455c !important;--text:#e7f2f8 !important;--muted:#93adbf !important;--accent:#3db7c9 !important;--accent-ink:#062026 !important;--accent-line:#2a8f9e !important;--good:#7dcea0 !important;--warn:#e2b15a !important;--bad:#e07a68 !important;--sat:#9eb4d0 !important;--stage:#071018 !important;--shadow:0 18px 40px rgba(0,0,0,.32) !important}
 html[data-theme="amber"]{color-scheme:dark;--bg:#1a120c !important;--raise:#261910 !important;--raise-2:#322016 !important;--line:#4d3424 !important;--text:#f8efe6 !important;--muted:#c4a892 !important;--accent:#f0a04b !important;--accent-ink:#2a1606 !important;--accent-line:#c47a2a !important;--good:#c6d48a !important;--warn:#f0a04b !important;--bad:#e07a68 !important;--sat:#d7c3a4 !important;--stage:#100b08 !important;--shadow:0 18px 40px rgba(0,0,0,.35) !important}
+html[data-theme="forest"]{color-scheme:dark;--bg:#101a14 !important;--raise:#18261c !important;--raise-2:#213226 !important;--line:#34503c !important;--text:#e7f3ea !important;--muted:#9bb5a3 !important;--accent:#7dce6a !important;--accent-ink:#10210c !important;--accent-line:#4e9a45 !important;--good:#8fbf7a !important;--warn:#e2b15a !important;--bad:#e07a68 !important;--sat:#b7d0c0 !important;--stage:#0b120e !important;--shadow:0 18px 40px rgba(0,0,0,.35) !important}
+html[data-theme="slate"]{color-scheme:dark;--bg:#15181d !important;--raise:#1e242c !important;--raise-2:#283039 !important;--line:#3d4854 !important;--text:#e8eef4 !important;--muted:#9aa7b5 !important;--accent:#8eb4d4 !important;--accent-ink:#101820 !important;--accent-line:#5d87ab !important;--good:#8fbf9a !important;--warn:#e2b15a !important;--bad:#e07a68 !important;--sat:#c5d0dc !important;--stage:#0e1115 !important;--shadow:0 18px 40px rgba(0,0,0,.32) !important}
+html[data-theme="rose"]{color-scheme:dark;--bg:#1a1216 !important;--raise:#271a20 !important;--raise-2:#33222a !important;--line:#54343f !important;--text:#f8eef2 !important;--muted:#c4a3ae !important;--accent:#e08aa4 !important;--accent-ink:#2a1018 !important;--accent-line:#b86480 !important;--good:#c6d48a !important;--warn:#f0a04b !important;--bad:#e07a68 !important;--sat:#e4c4ce !important;--stage:#110c0e !important;--shadow:0 18px 40px rgba(0,0,0,.35) !important}
+html[data-theme="grape"]{color-scheme:dark;--bg:#16121c !important;--raise:#221c2c !important;--raise-2:#2d253a !important;--line:#4a3d5e !important;--text:#f3eef8 !important;--muted:#b5a6c4 !important;--accent:#c49aef !important;--accent-ink:#1c1028 !important;--accent-line:#8d68c0 !important;--good:#b7d49a !important;--warn:#e2b15a !important;--bad:#e07a68 !important;--sat:#d4c6e6 !important;--stage:#0e0b14 !important;--shadow:0 18px 40px rgba(0,0,0,.35) !important}
+html[data-theme="sand"]{color-scheme:light;--bg:#f7f1e4 !important;--raise:#fffaf1 !important;--raise-2:#efe4d0 !important;--line:#d9cbb4 !important;--text:#2c2418 !important;--muted:#6f6456 !important;--accent:#c47a3a !important;--accent-ink:#fff8ef !important;--accent-line:#8d5520 !important;--good:#2f7d46 !important;--warn:#a15c12 !important;--bad:#b42318 !important;--sat:#5c6b62 !important;--stage:#1c1916 !important;--shadow:0 18px 40px rgba(70,48,20,.12) !important}
+html[data-theme="midnight"]{color-scheme:dark;--bg:#070b12 !important;--raise:#101826 !important;--raise-2:#172235 !important;--line:#2a3a52 !important;--text:#e6eef8 !important;--muted:#8ea0b8 !important;--accent:#6ea8ff !important;--accent-ink:#061018 !important;--accent-line:#3d74c4 !important;--good:#7dcea0 !important;--warn:#e2b15a !important;--bad:#e07a68 !important;--sat:#b7c7dc !important;--stage:#04070d !important;--shadow:0 18px 40px rgba(0,0,0,.4) !important}
 </style>';
     echo '<script>
 document.addEventListener("DOMContentLoaded",function(){
@@ -143,7 +166,8 @@ document.addEventListener("DOMContentLoaded",function(){
   var help=document.getElementById("help");
   var loading=document.getElementById("loading");
   function applyTheme(name){
-    if(name!=="light"&&name!=="ocean"&&name!=="amber")name="dark";
+    var allowed=",' . implode(',', array_keys(appThemes())) . ',";
+    if(allowed.indexOf(","+name+",")<0)name="dark";
     root.setAttribute("data-theme",name);
     if(theme)theme.value=name;
     try{localStorage.setItem("e2-theme",name);}catch(e){}

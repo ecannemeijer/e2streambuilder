@@ -278,7 +278,7 @@ if ($activeHouse === '' && $homes !== []) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=27">
+    <link rel="stylesheet" href="assets/app.css?v=28">
     <?php appShellStyle(); ?>
 </head>
 <body>
@@ -513,6 +513,9 @@ if ($activeHouse === '' && $homes !== []) {
                             <input name="stream_port" type="number" min="1" max="65535" value="<?= (int) $house['stream_port'] ?>" required>
                         </label>
                         <button class="btn" type="submit">Save</button>
+                        <?php if (homePlaylistChannelCount($token) !== null): ?>
+                            <a class="btn" href="playlist-edit.php?house=<?= h($token) ?>">Edit m3u8</a>
+                        <?php endif; ?>
                     </form>
                     <div class="status"><i></i><span>Checking connection…</span></div>
                     <form method="post" action="index.php" class="slow">
@@ -728,6 +731,9 @@ if ($activeHouse === '' && $homes !== []) {
                                 <input name="stream_port" type="number" min="1" max="65535" value="<?= (int) $house['stream_port'] ?>" required>
                             </label>
                             <button class="btn" type="submit">Save</button>
+                            <?php if ($channelCount !== null): ?>
+                                <a class="btn" href="playlist-edit.php?house=<?= h($token) ?>">Edit m3u8</a>
+                            <?php endif; ?>
                             <p class="hint">The playlist address stays the same when you rename the house. A new stream port is used the next time you publish.</p>
                         </form>
                     </section>
