@@ -161,7 +161,7 @@ if (is_string($body) && $body !== '') {
                 <p>This playlist has changes. Save them before leaving this page?</p>
                 <div class="actions">
                     <button class="btn primary" type="button" id="leave-save">Save</button>
-                    <button class="btn" type="button" data-close>Cancel</button>
+                    <button class="btn" type="button" id="leave-close">Close</button>
                 </div>
             </div>
         </div>
@@ -506,6 +506,21 @@ if (is_string($body) && $body !== '') {
                 note.hidden = true;
                 document.getElementById("edit-layout").value = JSON.stringify(payload.layout);
             }, true);
+
+            document.getElementById("leave-close").addEventListener("click", function () {
+                document.getElementById("leave-guard").classList.remove("is-open");
+                if (window.playlistClearDirty) window.playlistClearDirty();
+                var form = pendingForm;
+                var url = pendingUrl;
+                pendingForm = null;
+                pendingUrl = "";
+                if (form) {
+                    if (form.requestSubmit) form.requestSubmit();
+                    else form.submit();
+                    return;
+                }
+                if (url) location.href = url;
+            });
 
             document.getElementById("leave-save").addEventListener("click", function () {
                 document.getElementById("leave-guard").classList.remove("is-open");
