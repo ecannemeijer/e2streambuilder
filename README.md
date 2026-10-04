@@ -48,7 +48,7 @@ TiviMate attaches programmes with `tvg-id`.
 
 ## Admin
 
-Copy `.env.example` to `.env` on the server. `APP_VERSION` is the number shown in the menu. Set `ADMIN_EMAIL` to the address that should be the admin while the site has no admin yet. Register or log in with that address and the account becomes admin. `MAIL_FROM` is the sender for welcome and playlist mail. Leave receiver addresses and `public_base` in `data/settings.json`. `.env` is not committed.
+Copy `.env.example` to `.env` on the server. `APP_VERSION` is the number shown in the menu. Set `ADMIN_EMAIL` to the address that should be the admin while the site has no admin yet. Register or log in with that address and the account becomes admin. `MAIL_FROM` is the sender for welcome and playlist mail. `PUBLIC_URL` is the public site address used in playlists, the publish bookmark, Xtream, and email. Leave receiver addresses in `data/settings.json`. `.env` is not committed.
 
 An admin also has the shared receiver tools. Enter the receiver, WebIF port, and stream port next to the house and save. The Playlist page can then read the bouquets directly and offers three live lists:
 
@@ -93,7 +93,7 @@ On Linux, run the nightly job as the web user so `data/` stays writable:
 
 That downloads the Rytec sources, rebuilds the shared guide and every published house guide, then rebuilds the Xtream catalogue. House channel lists stay as published.
 
-Mail and this cron job use `public_base` in `data/settings.json`. Set that to the public site address, for example `https://e2sb.duckdns.org`. Opening the site on another host does not change it. A page you are looking at still uses the host in the browser.
+Mail and this cron job use `PUBLIC_URL` in `.env`. Set that to the public site address, for example `https://e2sb.duckdns.org`. Playlist links, the publish bookmark, Xtream, welcome mail, and the password reset link all use that address. Opening the site on another host does not change it.
 
 On Windows, Task Scheduler can run `epg-update.bat`. `epg-update.php --force` runs an EPG update immediately. That path refreshes the guide and does not rebuild Xtream.
 

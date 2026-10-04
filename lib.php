@@ -848,15 +848,46 @@ function channelsForBouquet(string $ref): array
 
 function appBaseUrl(): string
 {
+    $configured = normalizePublicUrl(envValue('PUBLIC_URL'));
+    if ($configured !== '') {
+        return $configured;
+    }
+    $stored = normalizePublicUrl((string) (loadSettingsRaw()['public_base'] ?? ''));
+    if ($stored !== '') {
+        return $stored;
+    }
     if (!empty($_SERVER['HTTP_HOST'])) {
         return requestBaseUrl();
     }
-    $stored = trim((string) (loadSettingsRaw()['public_base'] ?? ''));
-    if ($stored !== '') {
-        return rtrim($stored, '/');
-    }
 
     return 'http://openwebif.test';
+}
+
+function normalizePublicUrl(string $url): string
+{
+    $url = rtrim(trim($url), '/');
+    if ($url === '') {
+        return '';
+    }
+    $parts = parse_url($url);
+    if (!is_array($parts)) {
+        return '';
+    }
+    $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+    $host = (string) ($parts['host'] ?? '');
+    if (($scheme !== 'http' && $scheme !== 'https') || $host === '' || isset($parts['user']) || isset($parts['pass'])) {
+        return '';
+    }
+    if (isset($parts['query']) || isset($parts['fragment'])) {
+        return '';
+    }
+    $port = isset($parts['port']) ? ':' . (int) $parts['port'] : '';
+    $path = (string) ($parts['path'] ?? '');
+    if ($path === '/') {
+        $path = '';
+    }
+
+    return $scheme . '://' . $host . $port . $path;
 }
 
 function requestBaseUrl(): string
