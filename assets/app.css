@@ -94,7 +94,7 @@ body.scroll .menubar {
 .brand.compact .mark { width: 28px; height: 28px; flex: none; }
 .brand.compact strong { font-size: 0.95rem; white-space: nowrap; }
 
-.menubar .nav { flex: 0 1 auto; }
+.menubar .nav { display: contents; }
 .menubar > form { display: contents; margin: 0; }
 .menubar .nav-btn {
     color: var(--muted);
@@ -838,7 +838,7 @@ body.scroll .panel.stack { display: block; overflow: visible; margin-top: 14px; 
         justify-content: center;
     }
     .status { white-space: normal; }
-    .menubar .nav { flex: 1 1 100%; }
+    .menubar { gap: 8px; }
     .dialog {
         width: 100%;
         max-height: calc(100dvh - 24px);

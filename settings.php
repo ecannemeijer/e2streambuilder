@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_account'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Settings · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=30">
+    <link rel="stylesheet" href="assets/app.css?v=31">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">

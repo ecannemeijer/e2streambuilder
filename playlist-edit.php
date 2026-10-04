@@ -93,7 +93,7 @@ if (is_string($body) && $body !== '') {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Edit playlist · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=30">
+    <link rel="stylesheet" href="assets/app.css?v=31">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">

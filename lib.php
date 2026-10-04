@@ -44,39 +44,20 @@ function appThemes(): array
 
 function appNav(string $active): void
 {
-    $admin = function_exists('authIsAdmin') && authIsAdmin();
-    $items = [
-        'playlist' => ['Playlist', 'index.php', false],
-    ];
-    if ($admin) {
-        $items['epg'] = ['EPG', 'epg.php', true];
-        $items['mapping'] = ['EPG mapping', 'epg-mapping.php', true];
-        $items['users'] = ['Users', 'users.php', false];
-    }
+    $class = $active === 'playlist' ? ' class="active"' : '';
     echo '<nav class="nav">';
-    foreach ($items as $key => $item) {
-        $class = $key === $active ? ' class="active' . ($item[2] ? ' slow' : '') . '"' : ($item[2] ? ' class="slow"' : '');
-        echo '<a' . $class . ' href="' . h($item[1]) . '">' . h($item[0]) . '</a>';
+    echo '<a' . $class . ' href="index.php">Playlist</a>';
+    if (function_exists('authUser') && authUser() !== null) {
+        $settingsClass = $active === 'settings' ? ' class="active"' : '';
+        echo '<a' . $settingsClass . ' href="settings.php">Settings</a>';
     }
-    if ($admin) {
-        echo '<button class="nav-btn" type="button" id="xtream-open">Xtream</button>';
-        $eitClass = $active === 'eit' ? ' class="active"' : '';
-        echo '<a' . $eitClass . ' href="eit.php">EIT</a>';
-        echo '<form method="post" action="create-all.php">';
-        echo '<button class="nav-btn" type="submit" name="create_all" value="1">Create All</button>';
-        echo '</form>';
-    }
+    echo '<button class="btn" type="button" id="help-open">How it works</button>';
+    echo '<button class="btn" type="button" id="contact-open">Contact</button>';
     echo '<label class="theme"><span>Theme</span><select id="theme">';
     foreach (appThemes() as $value => $label) {
         echo '<option value="' . h($value) . '">' . h($label) . '</option>';
     }
     echo '</select></label>';
-    if (function_exists('authUser') && authUser() !== null) {
-        $settingsClass = $active === 'settings' ? ' class="active"' : '';
-        echo '<a' . $settingsClass . ' href="settings.php">Settings</a>';
-    }
-    echo '<button class="btn" type="button" id="contact-open">Contact</button>';
-    echo '<button class="btn" type="button" id="help-open">How it works</button>';
     echo '</nav>';
 }
 
@@ -92,18 +73,41 @@ function appFooter(): void
     echo '</footer>';
 }
 
+function appAdminNav(string $active): void
+{
+    if (!function_exists('authIsAdmin') || !authIsAdmin()) {
+        return;
+    }
+    echo '<nav class="nav">';
+    $items = [
+        'epg' => ['EPG', 'epg.php', true],
+        'mapping' => ['EPG mapping', 'epg-mapping.php', true],
+        'users' => ['Users', 'users.php', false],
+    ];
+    foreach ($items as $key => $item) {
+        $class = $key === $active ? ' class="active' . ($item[2] ? ' slow' : '') . '"' : ($item[2] ? ' class="slow"' : '');
+        echo '<a' . $class . ' href="' . h($item[1]) . '">' . h($item[0]) . '</a>';
+    }
+    echo '<button class="nav-btn" type="button" id="xtream-open">Xtream</button>';
+    $eitClass = $active === 'eit' ? ' class="active"' : '';
+    echo '<a' . $eitClass . ' href="eit.php">EIT</a>';
+    echo '<form method="post" action="create-all.php">';
+    echo '<button class="nav-btn" type="submit" name="create_all" value="1">Create All</button>';
+    echo '</form>';
+    echo '</nav>';
+}
+
 function appMenubar(string $active, string $activeHouse = ''): void
 {
     $account = function_exists('authUser') ? authUser() : null;
-    $admin = function_exists('authIsAdmin') && authIsAdmin($account);
     $homes = ($account !== null && function_exists('homeList')) ? homeList((int) $account['id']) : [];
     echo '<header class="menubar">';
     echo '<a class="brand compact" href="index.php">';
     echo '<span class="mark" aria-hidden="true"></span>';
     echo '<strong>E2 Stream Builder</strong>';
     echo '</a>';
-    appNav($active);
     if ($account === null) {
+        appNav($active);
         echo '<button class="nav-btn" type="button" id="login-open">Log in</button>';
         echo '<button class="nav-btn" type="button" id="register-open">Create account</button>';
         echo '</header>';
@@ -122,7 +126,7 @@ function appMenubar(string $active, string $activeHouse = ''): void
     }
     echo '</select></label>';
     echo '<button class="nav-btn" type="button" id="add-house-open">Add house</button>';
-    if (!$admin && $activeHouse !== '') {
+    if ($activeHouse !== '') {
         echo '<form method="post" action="index.php" onsubmit="return confirm(\'Remove this house?\');">';
         echo authCsrfField();
         echo '<input type="hidden" name="delete_home" value="1">';
@@ -130,11 +134,13 @@ function appMenubar(string $active, string $activeHouse = ''): void
         echo '<button class="nav-btn" type="submit">Remove house</button>';
         echo '</form>';
     }
+    appNav($active);
     echo '<form method="post" action="index.php">';
     echo authCsrfField();
     echo '<input type="hidden" name="logout" value="1">';
     echo '<button class="nav-btn" type="submit">Log out</button>';
     echo '</form>';
+    appAdminNav($active);
     echo '</header>';
     appFlash();
 }
