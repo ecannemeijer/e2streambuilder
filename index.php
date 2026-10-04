@@ -8,7 +8,9 @@ $formError = null;
 $homeError = null;
 $authError = null;
 $authOk = false;
+$authBlocked = false;
 $authDialog = '';
+$openDialog = (string) ($_GET['open'] ?? '');
 $saved = isset($_GET['saved']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
@@ -91,6 +93,10 @@ if ($flash['message'] !== '') {
     $authError = $flash['message'];
     $authDialog = $flash['dialog'];
     $authOk = $flash['ok'];
+    $authBlocked = str_contains($authError, 'blocked');
+    if ($authBlocked) {
+        $authDialog = '';
+    }
 }
 $authUsername = $flash['username'];
 $mailNote = null;
@@ -272,17 +278,17 @@ if ($activeHouse === '' && $homes !== []) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=24">
+    <link rel="stylesheet" href="assets/app.css?v=27">
     <?php appShellStyle(); ?>
 </head>
 <body>
 <?php appChrome(); ?>
-<div id="login" class="<?= $authDialog === 'login' ? 'is-open' : '' ?>">
+<div id="login" class="<?= ($authDialog === 'login' || $openDialog === 'login') ? 'is-open' : '' ?>">
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="login-title">
-        <h2 id="login-title">Log in</h2>
+        <h2 id="login-title"><?= $authDialog === 'login' && $authError !== null ? 'Wrong password' : 'Log in' ?></h2>
         <p>Your houses stay on this account. Other accounts cannot see them.</p>
         <?php if ($authDialog === 'login' && $authError !== null): ?>
-            <p class="error"><?= h($authError) ?></p>
+            <p class="login-alert"><?= h($authError) ?></p>
         <?php endif; ?>
         <form class="stack" method="post" action="index.php">
             <?= authCsrfField() ?>
@@ -322,7 +328,7 @@ if ($activeHouse === '' && $homes !== []) {
         <button class="btn" type="button" data-close>Close</button>
     </div>
 </div>
-<div id="register" class="<?= $authDialog === 'register' ? 'is-open' : '' ?>">
+<div id="register" class="<?= ($authDialog === 'register' || $openDialog === 'register') ? 'is-open' : '' ?>">
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="register-title">
         <h2 id="register-title">Create account</h2>
         <p>Use your email address and a password of at least 8 characters. A welcome message is sent to that address.</p>
@@ -346,7 +352,7 @@ if ($activeHouse === '' && $homes !== []) {
     </div>
 </div>
 <?php if ($account !== null): ?>
-<div id="password" class="<?= $authDialog === 'password' ? 'is-open' : '' ?>">
+<div id="password" class="<?= ($authDialog === 'password' || $openDialog === 'password') ? 'is-open' : '' ?>">
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="password-title">
         <h2 id="password-title">Change password</h2>
         <p>Use a password of at least 8 characters.</p>
@@ -370,7 +376,7 @@ if ($activeHouse === '' && $homes !== []) {
     </div>
 </div>
 <?php endif; ?>
-<div id="add-house" class="<?= ($homeError !== null || ($account !== null && $homes === [])) ? 'is-open' : '' ?><?= ($account !== null && $homes === []) ? ' is-required' : '' ?>">
+<div id="add-house" class="<?= ($homeError !== null || ($account !== null && $homes === []) || $openDialog === 'add-house') ? 'is-open' : '' ?><?= ($account !== null && $homes === []) ? ' is-required' : '' ?>">
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="add-house-title">
         <h2 id="add-house-title">Add house</h2>
         <p>This house is saved on your account. Only you see its playlist address.</p>
@@ -436,48 +442,16 @@ if ($activeHouse === '' && $homes !== []) {
 </div>
 <?php endif; ?>
 <div class="app homes">
-    <header class="menubar">
-        <a class="brand compact" href="index.php">
-            <span class="mark" aria-hidden="true"></span>
-            <strong>E2 Stream Builder</strong>
-        </a>
-        <?php appNav('playlist'); ?>
-        <?php if ($account === null): ?>
-            <button class="nav-btn" type="button" id="login-open">Log in</button>
-            <button class="nav-btn" type="button" id="register-open">Create account</button>
-        <?php else: ?>
-            <label class="house-switch">
-                <span>You are</span>
-                <select id="house-pick">
-                    <?php if ($homes === []): ?>
-                        <option value="">No house</option>
-                    <?php endif; ?>
-                    <?php foreach ($homes as $house): ?>
-                        <option value="<?= h((string) $house['token']) ?>"<?= (string) $house['token'] === $activeHouse ? ' selected' : '' ?>><?= h((string) $house['name']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-            <button class="nav-btn" type="button" id="add-house-open">Add house</button>
-            <?php if (!$isAdmin && $activeHouse !== ''): ?>
-            <form method="post" action="index.php" onsubmit="return confirm('Remove this house?');">
-                <?= authCsrfField() ?>
-                <input type="hidden" name="delete_home" value="1">
-                <input type="hidden" name="token" id="remove-house-token" value="<?= h($activeHouse) ?>">
-                <button class="nav-btn" type="submit">Remove house</button>
-            </form>
-            <?php endif; ?>
-            <button class="nav-btn" type="button" id="password-open">Password</button>
-            <form method="post" action="index.php">
-                <?= authCsrfField() ?>
-                <input type="hidden" name="logout" value="1">
-                <button class="nav-btn" type="submit">Log out</button>
-            </form>
-        <?php endif; ?>
-    </header>
+    <?php appMenubar('playlist', $activeHouse); ?>
 
     <div class="housebars">
-        <?php if ($authError !== null): ?>
-            <p class="error"><?= h($authError) ?></p>
+        <?php if ($authBlocked): ?>
+            <section class="login-alert">
+                <h2>Account blocked</h2>
+                <p><?= h((string) $authError) ?></p>
+            </section>
+        <?php elseif ($authError !== null): ?>
+            <p class="login-alert"><?= h($authError) ?></p>
         <?php elseif ($isAdmin && $homes === []): ?>
             <p class="note">Add a house. The menu then shows that name next to “You are”.</p>
         <?php endif; ?>

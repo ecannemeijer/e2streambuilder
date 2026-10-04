@@ -78,23 +78,17 @@ function mappingHref(string $status, string $query, int $page): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>EPG mapping · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=24">
+    <link rel="stylesheet" href="assets/app.css?v=27">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">
 <?php appChrome(); ?>
 <div class="app">
-    <header class="top">
-        <div class="brand">
-            <div class="mark" aria-hidden="true"></div>
-            <div>
-                <p class="eyebrow">E2 Stream Builder</p>
-                <h1>EPG mapping</h1>
-                <p class="lede">Manual mappings are kept and always win over automatic matching.</p>
-            </div>
-        </div>
+    <?php appMenubar('mapping'); ?>
+    <header class="pagehead">
+        <h1>EPG mapping</h1>
+        <p class="lede">Manual mappings are kept and always win over automatic matching.</p>
     </header>
-    <?php appNav('mapping'); ?>
 
     <?php if ($error !== null): ?>
         <p class="error"><?= h($error) ?></p>

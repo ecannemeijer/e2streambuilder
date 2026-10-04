@@ -63,6 +63,52 @@ function appNav(string $active): void
     echo '</nav>';
 }
 
+function appMenubar(string $active, string $activeHouse = ''): void
+{
+    $account = function_exists('authUser') ? authUser() : null;
+    $admin = function_exists('authIsAdmin') && authIsAdmin($account);
+    $homes = ($account !== null && function_exists('homeList')) ? homeList((int) $account['id']) : [];
+    echo '<header class="menubar">';
+    echo '<a class="brand compact" href="index.php">';
+    echo '<span class="mark" aria-hidden="true"></span>';
+    echo '<strong>E2 Stream Builder</strong>';
+    echo '</a>';
+    appNav($active);
+    if ($account === null) {
+        echo '<button class="nav-btn" type="button" id="login-open">Log in</button>';
+        echo '<button class="nav-btn" type="button" id="register-open">Create account</button>';
+        echo '</header>';
+
+        return;
+    }
+    echo '<label class="house-switch"><span>You are</span><select id="house-pick">';
+    if ($homes === []) {
+        echo '<option value="">No house</option>';
+    }
+    foreach ($homes as $house) {
+        $token = (string) $house['token'];
+        $selected = $token === $activeHouse ? ' selected' : '';
+        echo '<option value="' . h($token) . '"' . $selected . '>' . h((string) $house['name']) . '</option>';
+    }
+    echo '</select></label>';
+    echo '<button class="nav-btn" type="button" id="add-house-open">Add house</button>';
+    if (!$admin && $activeHouse !== '') {
+        echo '<form method="post" action="index.php" onsubmit="return confirm(\'Remove this house?\');">';
+        echo authCsrfField();
+        echo '<input type="hidden" name="delete_home" value="1">';
+        echo '<input type="hidden" name="token" id="remove-house-token" value="' . h($activeHouse) . '">';
+        echo '<button class="nav-btn" type="submit">Remove house</button>';
+        echo '</form>';
+    }
+    echo '<button class="nav-btn" type="button" id="password-open">Password</button>';
+    echo '<form method="post" action="index.php">';
+    echo authCsrfField();
+    echo '<input type="hidden" name="logout" value="1">';
+    echo '<button class="nav-btn" type="submit">Log out</button>';
+    echo '</form>';
+    echo '</header>';
+}
+
 function appThemeScript(): void
 {
     echo '<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">';
@@ -81,7 +127,7 @@ function appShellStyle(): void
 #remote .dialog{width:min(720px,100%)}
 #help .dialog h2,#xtream .dialog h2,#receiver .dialog h2,#add-house .dialog h2,#login .dialog h2,#register .dialog h2,#forgot .dialog h2,#password .dialog h2,#remote .dialog h2{margin:0 0 8px}
 #help .dialog p,#help .dialog li,#xtream .dialog p,#xtream .dialog li,#receiver .dialog p,#add-house .dialog p,#login .dialog p,#register .dialog p,#forgot .dialog p,#password .dialog p,#remote .dialog p,#remote .dialog li{color:var(--muted,#93a196)}
-#login .dialog p.error,#register .dialog p.error,#forgot .dialog p.error,#password .dialog p.error,#add-house .dialog p.error,#receiver .dialog p.error{color:#e07a68 !important;font-weight:700}
+#login .dialog p.error,#register .dialog p.error,#forgot .dialog p.error,#password .dialog p.error,#add-house .dialog p.error,#receiver .dialog p.error,#login .dialog p.login-alert{color:#e07a68 !important;font-weight:700}
 #forgot .dialog p.oknote{color:#8fbf7a !important;font-weight:700}
 #login .dialog .field input,#register .dialog .field input,#forgot .dialog .field input,#password .dialog .field input,#add-house .dialog .field input{width:100%;box-sizing:border-box}
 #help .dialog ol{margin:0 0 12px;padding-left:1.2rem}
@@ -135,6 +181,18 @@ document.addEventListener("DOMContentLoaded",function(){
   bindOverlay("password","password-open");
   bindOverlay("register","register-open");
   bindOverlay("forgot","forgot-open");
+  document.querySelectorAll("#add-house-open,#password-open,#login-open,#register-open").forEach(function(button){
+    button.addEventListener("click",function(){
+      var id=button.id.replace(/-open$/,"");
+      if(!document.getElementById(id))location.href="index.php?open="+id;
+    });
+  });
+  var housePick=document.getElementById("house-pick");
+  if(housePick&&!document.querySelector(".housebar,.user-house")){
+    housePick.addEventListener("change",function(){
+      if(housePick.value)location.href="index.php?house="+encodeURIComponent(housePick.value);
+    });
+  }
   var toForgot=document.getElementById("forgot-open");
   if(toForgot)toForgot.addEventListener("click",function(){
     var login=document.getElementById("login");

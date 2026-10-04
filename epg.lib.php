@@ -1009,12 +1009,6 @@ function authThrottleGate(string $action): void
 {
     $db = epgDb();
     $db->prepare('DELETE FROM auth_attempts WHERE failed_at < ?')->execute([date('Y-m-d H:i:s', time() - 3600)]);
-    $stmt = $db->prepare('SELECT COUNT(*) FROM auth_attempts WHERE address = ? AND action = ? AND failed_at >= ?');
-    $stmt->execute([authClientAddress(), $action, date('Y-m-d H:i:s', time() - 900)]);
-    $count = (int) $stmt->fetchColumn();
-    if ($count >= 5) {
-        sleep(min(8, 2 + ($count - 5)));
-    }
 }
 
 function authThrottleNote(string $action): void
@@ -1032,10 +1026,10 @@ function authLogin(string $username, string $password): array
     $row = $stmt->fetch();
     if (!is_array($row)) {
         authThrottleNote('login');
-        throw new InvalidArgumentException('Wrong password.');
+        throw new InvalidArgumentException('You have entered a wrong password.');
     }
     if (trim((string) ($row['locked_at'] ?? '')) !== '') {
-        throw new InvalidArgumentException('This account is blocked after 5 wrong passwords. An admin can unblock it on the Users page.');
+        throw new InvalidArgumentException('This account is blocked. You entered a wrong password 5 times. An admin can unblock it on the Users page.');
     }
     $hash = (string) $row['password_hash'];
     if ($hash === '' || !password_verify($password, $hash)) {
@@ -1046,14 +1040,16 @@ function authLogin(string $username, string $password): array
         if ($fails >= 5 && !$lastAdmin) {
             epgDb()->prepare('UPDATE users SET failed_logins = ?, locked_at = ? WHERE id = ?')
                 ->execute([$fails, epgNow(), (int) $row['id']]);
-            throw new InvalidArgumentException('This account is blocked after 5 wrong passwords. An admin can unblock it on the Users page.');
+            throw new InvalidArgumentException('This account is blocked. You entered a wrong password 5 times. An admin can unblock it on the Users page.');
         }
         if ($lastAdmin) {
             $fails = min($fails, 4);
+            epgDb()->prepare('UPDATE users SET failed_logins = ? WHERE id = ?')->execute([$fails, (int) $row['id']]);
+            throw new InvalidArgumentException('You have entered a wrong password.');
         }
         epgDb()->prepare('UPDATE users SET failed_logins = ? WHERE id = ?')->execute([$fails, (int) $row['id']]);
         $left = 5 - $fails;
-        throw new InvalidArgumentException('Wrong password. ' . $left . ' attempt' . ($left === 1 ? '' : 's') . ' left before this account is blocked.');
+        throw new InvalidArgumentException('You have entered a wrong password. ' . $left . ' attempt' . ($left === 1 ? '' : 's') . ' left.');
     }
     epgDb()->prepare('UPDATE users SET failed_logins = 0, locked_at = NULL, last_login_at = ?, last_login_ip = ? WHERE id = ?')
         ->execute([epgNow(), authClientAddress(), (int) $row['id']]);

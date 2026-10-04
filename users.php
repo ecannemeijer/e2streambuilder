@@ -84,23 +84,17 @@ $users = authUserList();
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Users · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=26">
+    <link rel="stylesheet" href="assets/app.css?v=27">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">
 <?php appChrome(); ?>
 <div class="app">
-    <header class="top">
-        <div class="brand">
-            <div class="mark" aria-hidden="true"></div>
-            <div>
-                <p class="eyebrow">E2 Stream Builder</p>
-                <h1>Users</h1>
-                <p class="lede">Change an email address, set a new password, make an account an admin, or remove it. A blocked account tried the wrong password five times. Unblock lets that person log in again. Removing an account also removes its houses.</p>
-            </div>
-        </div>
+    <?php appMenubar('users'); ?>
+    <header class="pagehead">
+        <h1>Users</h1>
+        <p class="lede">Change an email address, set a new password, make an account an admin, or remove it. A blocked account tried the wrong password five times. Unblock lets that person log in again. Removing an account also removes its houses.</p>
     </header>
-    <?php appNav('users'); ?>
 
     <?php if ($error !== null): ?>
         <p class="error"><?= h($error) ?></p>

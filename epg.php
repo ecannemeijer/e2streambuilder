@@ -102,23 +102,17 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>EPG · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=24">
+    <link rel="stylesheet" href="assets/app.css?v=27">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">
 <?php appChrome(); ?>
 <div class="app">
-    <header class="top">
-        <div class="brand">
-            <div class="mark" aria-hidden="true"></div>
-            <div>
-                <p class="eyebrow">E2 Stream Builder</p>
-                <h1>EPG</h1>
-                <p class="lede">Download Rytec XMLTV, match it to your channels, and serve the guide to TiviMate.</p>
-            </div>
-        </div>
+    <?php appMenubar('epg'); ?>
+    <header class="pagehead">
+        <h1>EPG</h1>
+        <p class="lede">Download Rytec XMLTV, match it to your channels, and serve the guide to TiviMate.</p>
     </header>
-    <?php appNav('epg'); ?>
 
     <?php if ($error !== null): ?>
         <p class="error"><?= h($error) ?></p>

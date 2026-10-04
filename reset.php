@@ -33,23 +33,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>New password · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=25">
+    <link rel="stylesheet" href="assets/app.css?v=27">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">
 <?php appChrome(); ?>
 <div class="app">
-    <header class="top">
-        <div class="brand">
-            <div class="mark" aria-hidden="true"></div>
-            <div>
-                <p class="eyebrow">E2 Stream Builder</p>
-                <h1>New password</h1>
-                <p class="lede">Choose a password of at least 8 characters. This link works once.</p>
-            </div>
-        </div>
+    <?php appMenubar('playlist'); ?>
+    <header class="pagehead">
+        <h1>New password</h1>
+        <p class="lede">Choose a password of at least 8 characters. This link works once.</p>
     </header>
-    <?php appNav('playlist'); ?>
     <section class="panel" style="padding:16px;max-width:28rem">
         <?php if ($saved): ?>
             <p class="oknote">Password saved. You can log in with it.</p>

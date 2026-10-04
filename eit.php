@@ -65,23 +65,17 @@ $eitError = epgStateGet('eit_error') ?? '';
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>EIT · E2 Stream Builder</title>
     <?php appThemeScript(); ?>
-    <link rel="stylesheet" href="assets/app.css?v=24">
+    <link rel="stylesheet" href="assets/app.css?v=27">
     <?php appShellStyle(); ?>
 </head>
 <body class="scroll">
 <?php appChrome(); ?>
 <div class="app">
-    <header class="top">
-        <div class="brand">
-            <div class="mark" aria-hidden="true"></div>
-            <div>
-                <p class="eyebrow">E2 Stream Builder</p>
-                <h1>EIT</h1>
-                <p class="lede">Build a guide for today from the programme cache on the receiver. The Rytec guide stays available on its own address.</p>
-            </div>
-        </div>
+    <?php appMenubar('eit'); ?>
+    <header class="pagehead">
+        <h1>EIT</h1>
+        <p class="lede">Build a guide for today from the programme cache on the receiver. The Rytec guide stays available on its own address.</p>
     </header>
-    <?php appNav('eit'); ?>
 
     <?php if ($error !== null): ?>
         <p class="error"><?= h($error) ?></p>

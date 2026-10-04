@@ -59,6 +59,29 @@ button { cursor: pointer; }
     align-items: center;
     gap: 8px 10px;
 }
+body.scroll .menubar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: var(--bg);
+    padding: 12px 0 10px;
+}
+
+.login-alert {
+    margin: 0;
+    padding: 14px 16px;
+    border: 1px solid var(--bad);
+    border-radius: 12px;
+    background: rgba(224, 122, 104, 0.16);
+    color: var(--bad);
+    font-weight: 700;
+}
+.login-alert h2 { margin: 0 0 6px; font-size: 1.15rem; color: var(--bad); }
+.login-alert p { margin: 0; }
+
+.pagehead { margin: 4px 0 16px; }
+.pagehead h1 { margin: 0 0 4px; font-size: 1.35rem; }
+.pagehead .lede { margin: 0; max-width: 46rem; }
 
 .brand.compact {
     display: flex;
